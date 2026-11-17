@@ -1,0 +1,197 @@
+{
+  "OptStep_token1": {
+    "type": "PATTERN",
+    "content": "[Ss][Tt][Ee][Pp]",
+    "transformedName": "STEP"
+  },
+  "Stmt_token1": {
+    "type": "PATTERN",
+    "content": "[Ww][Hh][Ii][Ll][Ee]",
+    "transformedName": "WHILE"
+  },
+  "Stmt_token2": {
+    "type": "PATTERN",
+    "content": "[Ee][Nn][Dd][Ww][Hh][Ii][Ll][Ee]",
+    "transformedName": "ENDWHILE"
+  },
+  ":": {
+    "type": "STRING",
+    "content": ":",
+    "transformedName": ":"
+  },
+  "Stmt_token3": {
+    "type": "PATTERN",
+    "content": "[Gg][Oo][Tt][Oo]",
+    "transformedName": "GOTO"
+  },
+  "Stmt_token4": {
+    "type": "PATTERN",
+    "content": "[Ff][Oo][Rr]",
+    "transformedName": "FOR"
+  },
+  "=": {
+    "type": "STRING",
+    "content": "=",
+    "transformedName": "="
+  },
+  "Stmt_token5": {
+    "type": "PATTERN",
+    "content": "[Tt][Oo]",
+    "transformedName": "TO"
+  },
+  "Stmt_token6": {
+    "type": "PATTERN",
+    "content": "[Ee][Nn][Dd][Ff][Oo][Rr]",
+    "transformedName": "ENDFOR"
+  },
+  "Stmt_token7": {
+    "type": "PATTERN",
+    "content": "[Ss][Uu][Bb]",
+    "transformedName": "SUB"
+  },
+  "Stmt_token8": {
+    "type": "PATTERN",
+    "content": "[Ee][Nn][Dd][Ss][Uu][Bb]",
+    "transformedName": "ENDSUB"
+  },
+  "Stmt_token9": {
+    "type": "PATTERN",
+    "content": "[Ii][Ff]",
+    "transformedName": "IF"
+  },
+  "Stmt_token10": {
+    "type": "PATTERN",
+    "content": "[Tt][Hh][Ee][Nn]",
+    "transformedName": "THEN"
+  },
+  "MoreThanZeroElseIf_token1": {
+    "type": "PATTERN",
+    "content": "[Ee][Ll][Ss][Ee][Ii][Ff]",
+    "transformedName": "ELSEIF"
+  },
+  "OptionalElse_token1": {
+    "type": "PATTERN",
+    "content": "[Ee][Nn][Dd][Ii][Ff]",
+    "transformedName": "ENDIF"
+  },
+  "OptionalElse_token2": {
+    "type": "PATTERN",
+    "content": "[Ee][Ll][Ss][Ee]",
+    "transformedName": "ELSE"
+  },
+  ".": {
+    "type": "STRING",
+    "content": ".",
+    "transformedName": "."
+  },
+  "(": {
+    "type": "STRING",
+    "content": "(",
+    "transformedName": "("
+  },
+  ")": {
+    "type": "STRING",
+    "content": ")",
+    "transformedName": ")"
+  },
+  ",": {
+    "type": "STRING",
+    "content": ",",
+    "transformedName": ","
+  },
+  "OrExpr_token1": {
+    "type": "PATTERN",
+    "content": "[Oo][Rr]",
+    "transformedName": "OR"
+  },
+  "AndExpr_token1": {
+    "type": "PATTERN",
+    "content": "[Aa][Nn][Dd]",
+    "transformedName": "AND"
+  },
+  "<>": {
+    "type": "STRING",
+    "content": "<>",
+    "transformedName": "<>"
+  },
+  "<": {
+    "type": "STRING",
+    "content": "<",
+    "transformedName": "<"
+  },
+  "<=": {
+    "type": "STRING",
+    "content": "<=",
+    "transformedName": "<="
+  },
+  ">": {
+    "type": "STRING",
+    "content": ">",
+    "transformedName": ">"
+  },
+  ">=": {
+    "type": "STRING",
+    "content": ">=",
+    "transformedName": ">="
+  },
+  "+": {
+    "type": "STRING",
+    "content": "+",
+    "transformedName": "+"
+  },
+  "-": {
+    "type": "STRING",
+    "content": "-",
+    "transformedName": "-"
+  },
+  "*": {
+    "type": "STRING",
+    "content": "*",
+    "transformedName": "*"
+  },
+  "/": {
+    "type": "STRING",
+    "content": "/",
+    "transformedName": "/"
+  },
+  "[": {
+    "type": "STRING",
+    "content": "[",
+    "transformedName": "["
+  },
+  "]": {
+    "type": "STRING",
+    "content": "]",
+    "transformedName": "]"
+  },
+  "ID": {
+    "type": "PATTERN",
+    "content": "[_a-zA-Z][_a-zA-Z0-9]*",
+    "transformedName": "ID"
+  },
+  "STR": {
+    "type": "PATTERN",
+    "content": "\\\"[^\\\"]*\\\"",
+    "transformedName": "STR"
+  },
+  "NUM": {
+    "type": "PATTERN",
+    "content": "([0-9]*[.])?[0-9]+",
+    "transformedName": "NUM"
+  },
+  "CR_token1": {
+    "type": "PATTERN",
+    "content": "\\r\\n",
+    "transformedName": "<CR>"
+  },
+  "CR_token2": {
+    "type": "PATTERN",
+    "content": "\\n",
+    "transformedName": "<CR>"
+  },
+  "Comment": {
+    "type": "COMPLEX",
+    "content": "Seq([Pattern(\"\\\\'\", \"\"), Pattern(\".*\", \"\")])",
+    "transformedName": "Comment"
+  }
+}

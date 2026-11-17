@@ -1,0 +1,797 @@
+{
+  "preproc_include_token1": {
+    "type": "PATTERN",
+    "content": "#[ \t]*include",
+    "transformedName": "#include"
+  },
+  "preproc_include_token2": {
+    "type": "COMPLEX",
+    "content": "Metadata { params: MetadataParams { precedence: None, dynamic_precedence: 0, associativity: None, is_token: true, is_main_token: true, alias: None, field_name: None }, rule: Pattern(\"\\\\r?\\\\n\", \"\") }",
+    "transformedName": "<newline>"
+  },
+  "preproc_def_token1": {
+    "type": "PATTERN",
+    "content": "#[ \t]*define",
+    "transformedName": "#define"
+  },
+  "(": {
+    "type": "STRING",
+    "content": "(",
+    "transformedName": "("
+  },
+  "...": {
+    "type": "STRING",
+    "content": "...",
+    "transformedName": "..."
+  },
+  ",": {
+    "type": "STRING",
+    "content": ",",
+    "transformedName": ","
+  },
+  ")": {
+    "type": "STRING",
+    "content": ")",
+    "transformedName": ")"
+  },
+  "preproc_if_token1": {
+    "type": "PATTERN",
+    "content": "#[ \t]*if",
+    "transformedName": "#if"
+  },
+  "\n": {
+    "type": "STRING",
+    "content": "\n",
+    "transformedName": "\n"
+  },
+  "preproc_if_token2": {
+    "type": "PATTERN",
+    "content": "#[ \t]*endif",
+    "transformedName": "#endif"
+  },
+  "preproc_ifdef_token1": {
+    "type": "PATTERN",
+    "content": "#[ \t]*ifdef",
+    "transformedName": "#ifdef"
+  },
+  "preproc_ifdef_token2": {
+    "type": "PATTERN",
+    "content": "#[ \t]*ifndef",
+    "transformedName": "#ifndef"
+  },
+  "preproc_else_token1": {
+    "type": "PATTERN",
+    "content": "#[ \t]*else",
+    "transformedName": "#else"
+  },
+  "preproc_elif_token1": {
+    "type": "PATTERN",
+    "content": "#[ \t]*elif",
+    "transformedName": "#elif"
+  },
+  "preproc_elifdef_token1": {
+    "type": "PATTERN",
+    "content": "#[ \t]*elifdef",
+    "transformedName": "#elifdef"
+  },
+  "preproc_elifdef_token2": {
+    "type": "PATTERN",
+    "content": "#[ \t]*elifndef",
+    "transformedName": "#elifndef"
+  },
+  "preproc_arg": {
+    "type": "COMPLEX",
+    "content": "Metadata { params: MetadataParams { precedence: Integer(-1), dynamic_precedence: 0, associativity: None, is_token: true, is_main_token: false, alias: None, field_name: None }, rule: Pattern(\"\\\\S([^/\\\\n]|\\\\/[^*]|\\\\\\\\\\\\r?\\\\n)*\", \"\") }",
+    "transformedName": "preproc_arg"
+  },
+  "preproc_directive": {
+    "type": "PATTERN",
+    "content": "#[ \\t]*[a-zA-Z0-9]\\w*",
+    "transformedName": "preproc_directive"
+  },
+  "defined": {
+    "type": "STRING",
+    "content": "defined",
+    "transformedName": "defined"
+  },
+  "!": {
+    "type": "STRING",
+    "content": "!",
+    "transformedName": "!"
+  },
+  "~": {
+    "type": "STRING",
+    "content": "~",
+    "transformedName": "~"
+  },
+  "-": {
+    "type": "STRING",
+    "content": "-",
+    "transformedName": "-"
+  },
+  "+": {
+    "type": "STRING",
+    "content": "+",
+    "transformedName": "+"
+  },
+  "*": {
+    "type": "STRING",
+    "content": "*",
+    "transformedName": "*"
+  },
+  "/": {
+    "type": "STRING",
+    "content": "/",
+    "transformedName": "/"
+  },
+  "%": {
+    "type": "STRING",
+    "content": "%",
+    "transformedName": "%"
+  },
+  "||": {
+    "type": "STRING",
+    "content": "||",
+    "transformedName": "||"
+  },
+  "&&": {
+    "type": "STRING",
+    "content": "&&",
+    "transformedName": "&&"
+  },
+  "|": {
+    "type": "STRING",
+    "content": "|",
+    "transformedName": "|"
+  },
+  "^": {
+    "type": "STRING",
+    "content": "^",
+    "transformedName": "^"
+  },
+  "&": {
+    "type": "STRING",
+    "content": "&",
+    "transformedName": "&"
+  },
+  "==": {
+    "type": "STRING",
+    "content": "==",
+    "transformedName": "=="
+  },
+  "!=": {
+    "type": "STRING",
+    "content": "!=",
+    "transformedName": "!="
+  },
+  ">": {
+    "type": "STRING",
+    "content": ">",
+    "transformedName": ">"
+  },
+  ">=": {
+    "type": "STRING",
+    "content": ">=",
+    "transformedName": ">="
+  },
+  "<=": {
+    "type": "STRING",
+    "content": "<=",
+    "transformedName": "<="
+  },
+  "<": {
+    "type": "STRING",
+    "content": "<",
+    "transformedName": "<"
+  },
+  "<<": {
+    "type": "STRING",
+    "content": "<<",
+    "transformedName": "<<"
+  },
+  ">>": {
+    "type": "STRING",
+    "content": ">>",
+    "transformedName": ">>"
+  },
+  ";": {
+    "type": "STRING",
+    "content": ";",
+    "transformedName": ";"
+  },
+  "__extension__": {
+    "type": "STRING",
+    "content": "__extension__",
+    "transformedName": "__extension__"
+  },
+  "typedef": {
+    "type": "STRING",
+    "content": "typedef",
+    "transformedName": "typedef"
+  },
+  "extern": {
+    "type": "STRING",
+    "content": "extern",
+    "transformedName": "extern"
+  },
+  "__attribute__": {
+    "type": "STRING",
+    "content": "__attribute__",
+    "transformedName": "__attribute__"
+  },
+  "__attribute": {
+    "type": "STRING",
+    "content": "__attribute",
+    "transformedName": "__attribute"
+  },
+  "::": {
+    "type": "STRING",
+    "content": "::",
+    "transformedName": "::"
+  },
+  "[[": {
+    "type": "STRING",
+    "content": "[[",
+    "transformedName": "[["
+  },
+  "]]": {
+    "type": "STRING",
+    "content": "]]",
+    "transformedName": "]]"
+  },
+  "__declspec": {
+    "type": "STRING",
+    "content": "__declspec",
+    "transformedName": "__declspec"
+  },
+  "__based": {
+    "type": "STRING",
+    "content": "__based",
+    "transformedName": "__based"
+  },
+  "__cdecl": {
+    "type": "STRING",
+    "content": "__cdecl",
+    "transformedName": "__cdecl"
+  },
+  "__clrcall": {
+    "type": "STRING",
+    "content": "__clrcall",
+    "transformedName": "__clrcall"
+  },
+  "__stdcall": {
+    "type": "STRING",
+    "content": "__stdcall",
+    "transformedName": "__stdcall"
+  },
+  "__fastcall": {
+    "type": "STRING",
+    "content": "__fastcall",
+    "transformedName": "__fastcall"
+  },
+  "__thiscall": {
+    "type": "STRING",
+    "content": "__thiscall",
+    "transformedName": "__thiscall"
+  },
+  "__vectorcall": {
+    "type": "STRING",
+    "content": "__vectorcall",
+    "transformedName": "__vectorcall"
+  },
+  "ms_restrict_modifier": {
+    "type": "STRING",
+    "content": "__restrict",
+    "transformedName": "__restrict"
+  },
+  "ms_unsigned_ptr_modifier": {
+    "type": "STRING",
+    "content": "__uptr",
+    "transformedName": "__uptr"
+  },
+  "ms_signed_ptr_modifier": {
+    "type": "STRING",
+    "content": "__sptr",
+    "transformedName": "__sptr"
+  },
+  "_unaligned": {
+    "type": "STRING",
+    "content": "_unaligned",
+    "transformedName": "_unaligned"
+  },
+  "__unaligned": {
+    "type": "STRING",
+    "content": "__unaligned",
+    "transformedName": "__unaligned"
+  },
+  "{": {
+    "type": "STRING",
+    "content": "{",
+    "transformedName": "{"
+  },
+  "}": {
+    "type": "STRING",
+    "content": "}",
+    "transformedName": "}"
+  },
+  "signed": {
+    "type": "STRING",
+    "content": "signed",
+    "transformedName": "signed"
+  },
+  "unsigned": {
+    "type": "STRING",
+    "content": "unsigned",
+    "transformedName": "unsigned"
+  },
+  "long": {
+    "type": "STRING",
+    "content": "long",
+    "transformedName": "long"
+  },
+  "short": {
+    "type": "STRING",
+    "content": "short",
+    "transformedName": "short"
+  },
+  "[": {
+    "type": "STRING",
+    "content": "[",
+    "transformedName": "["
+  },
+  "static": {
+    "type": "STRING",
+    "content": "static",
+    "transformedName": "static"
+  },
+  "]": {
+    "type": "STRING",
+    "content": "]",
+    "transformedName": "]"
+  },
+  "=": {
+    "type": "STRING",
+    "content": "=",
+    "transformedName": "="
+  },
+  "auto": {
+    "type": "STRING",
+    "content": "auto",
+    "transformedName": "auto"
+  },
+  "register": {
+    "type": "STRING",
+    "content": "register",
+    "transformedName": "register"
+  },
+  "inline": {
+    "type": "STRING",
+    "content": "inline",
+    "transformedName": "inline"
+  },
+  "__inline": {
+    "type": "STRING",
+    "content": "__inline",
+    "transformedName": "__inline"
+  },
+  "__inline__": {
+    "type": "STRING",
+    "content": "__inline__",
+    "transformedName": "__inline__"
+  },
+  "__forceinline": {
+    "type": "STRING",
+    "content": "__forceinline",
+    "transformedName": "__forceinline"
+  },
+  "thread_local": {
+    "type": "STRING",
+    "content": "thread_local",
+    "transformedName": "thread_local"
+  },
+  "__thread": {
+    "type": "STRING",
+    "content": "__thread",
+    "transformedName": "__thread"
+  },
+  "const": {
+    "type": "STRING",
+    "content": "const",
+    "transformedName": "const"
+  },
+  "constexpr": {
+    "type": "STRING",
+    "content": "constexpr",
+    "transformedName": "constexpr"
+  },
+  "volatile": {
+    "type": "STRING",
+    "content": "volatile",
+    "transformedName": "volatile"
+  },
+  "restrict": {
+    "type": "STRING",
+    "content": "restrict",
+    "transformedName": "restrict"
+  },
+  "__restrict__": {
+    "type": "STRING",
+    "content": "__restrict__",
+    "transformedName": "__restrict__"
+  },
+  "_Atomic": {
+    "type": "STRING",
+    "content": "_Atomic",
+    "transformedName": "_Atomic"
+  },
+  "_Noreturn": {
+    "type": "STRING",
+    "content": "_Noreturn",
+    "transformedName": "_Noreturn"
+  },
+  "noreturn": {
+    "type": "STRING",
+    "content": "noreturn",
+    "transformedName": "noreturn"
+  },
+  "_Nonnull": {
+    "type": "STRING",
+    "content": "_Nonnull",
+    "transformedName": "_Nonnull"
+  },
+  "alignas": {
+    "type": "STRING",
+    "content": "alignas",
+    "transformedName": "alignas"
+  },
+  "_Alignas": {
+    "type": "STRING",
+    "content": "_Alignas",
+    "transformedName": "_Alignas"
+  },
+  "primitive_type": {
+    "type": "COMPLEX",
+    "content": "Choice([String(\"bool\"), String(\"char\"), String(\"int\"), String(\"float\"), String(\"double\"), String(\"void\"), String(\"size_t\"), String(\"ssize_t\"), String(\"ptrdiff_t\"), String(\"intptr_t\"), String(\"uintptr_t\"), String(\"charptr_t\"), String(\"nullptr_t\"), String(\"max_align_t\"), String(\"int8_t\"), String(\"int16_t\"), String(\"int32_t\"), String(\"int64_t\"), String(\"uint8_t\"), String(\"uint16_t\"), String(\"uint32_t\"), String(\"uint64_t\"), String(\"char8_t\"), String(\"char16_t\"), String(\"char32_t\"), String(\"char64_t\")])",
+    "transformedName": "primitive_type"
+  },
+  "enum": {
+    "type": "STRING",
+    "content": "enum",
+    "transformedName": "enum"
+  },
+  ":": {
+    "type": "STRING",
+    "content": ":",
+    "transformedName": ":"
+  },
+  "struct": {
+    "type": "STRING",
+    "content": "struct",
+    "transformedName": "struct"
+  },
+  "union": {
+    "type": "STRING",
+    "content": "union",
+    "transformedName": "union"
+  },
+  "if": {
+    "type": "STRING",
+    "content": "if",
+    "transformedName": "if"
+  },
+  "else": {
+    "type": "STRING",
+    "content": "else",
+    "transformedName": "else"
+  },
+  "switch": {
+    "type": "STRING",
+    "content": "switch",
+    "transformedName": "switch"
+  },
+  "case": {
+    "type": "STRING",
+    "content": "case",
+    "transformedName": "case"
+  },
+  "default": {
+    "type": "STRING",
+    "content": "default",
+    "transformedName": "default"
+  },
+  "while": {
+    "type": "STRING",
+    "content": "while",
+    "transformedName": "while"
+  },
+  "do": {
+    "type": "STRING",
+    "content": "do",
+    "transformedName": "do"
+  },
+  "for": {
+    "type": "STRING",
+    "content": "for",
+    "transformedName": "for"
+  },
+  "return": {
+    "type": "STRING",
+    "content": "return",
+    "transformedName": "return"
+  },
+  "break": {
+    "type": "STRING",
+    "content": "break",
+    "transformedName": "break"
+  },
+  "continue": {
+    "type": "STRING",
+    "content": "continue",
+    "transformedName": "continue"
+  },
+  "goto": {
+    "type": "STRING",
+    "content": "goto",
+    "transformedName": "goto"
+  },
+  "__try": {
+    "type": "STRING",
+    "content": "__try",
+    "transformedName": "__try"
+  },
+  "__except": {
+    "type": "STRING",
+    "content": "__except",
+    "transformedName": "__except"
+  },
+  "__finally": {
+    "type": "STRING",
+    "content": "__finally",
+    "transformedName": "__finally"
+  },
+  "__leave": {
+    "type": "STRING",
+    "content": "__leave",
+    "transformedName": "__leave"
+  },
+  "?": {
+    "type": "STRING",
+    "content": "?",
+    "transformedName": "?"
+  },
+  "*=": {
+    "type": "STRING",
+    "content": "*=",
+    "transformedName": "*="
+  },
+  "/=": {
+    "type": "STRING",
+    "content": "/=",
+    "transformedName": "/="
+  },
+  "%=": {
+    "type": "STRING",
+    "content": "%=",
+    "transformedName": "%="
+  },
+  "+=": {
+    "type": "STRING",
+    "content": "+=",
+    "transformedName": "+="
+  },
+  "-=": {
+    "type": "STRING",
+    "content": "-=",
+    "transformedName": "-="
+  },
+  "<<=": {
+    "type": "STRING",
+    "content": "<<=",
+    "transformedName": "<<="
+  },
+  ">>=": {
+    "type": "STRING",
+    "content": ">>=",
+    "transformedName": ">>="
+  },
+  "&=": {
+    "type": "STRING",
+    "content": "&=",
+    "transformedName": "&="
+  },
+  "^=": {
+    "type": "STRING",
+    "content": "^=",
+    "transformedName": "^="
+  },
+  "|=": {
+    "type": "STRING",
+    "content": "|=",
+    "transformedName": "|="
+  },
+  "--": {
+    "type": "STRING",
+    "content": "--",
+    "transformedName": "--"
+  },
+  "++": {
+    "type": "STRING",
+    "content": "++",
+    "transformedName": "++"
+  },
+  "sizeof": {
+    "type": "STRING",
+    "content": "sizeof",
+    "transformedName": "sizeof"
+  },
+  "__alignof__": {
+    "type": "STRING",
+    "content": "__alignof__",
+    "transformedName": "__alignof__"
+  },
+  "__alignof": {
+    "type": "STRING",
+    "content": "__alignof",
+    "transformedName": "__alignof"
+  },
+  "_alignof": {
+    "type": "STRING",
+    "content": "_alignof",
+    "transformedName": "_alignof"
+  },
+  "alignof": {
+    "type": "STRING",
+    "content": "alignof",
+    "transformedName": "alignof"
+  },
+  "_Alignof": {
+    "type": "STRING",
+    "content": "_Alignof",
+    "transformedName": "_Alignof"
+  },
+  "offsetof": {
+    "type": "STRING",
+    "content": "offsetof",
+    "transformedName": "offsetof"
+  },
+  "_Generic": {
+    "type": "STRING",
+    "content": "_Generic",
+    "transformedName": "_Generic"
+  },
+  "asm": {
+    "type": "STRING",
+    "content": "asm",
+    "transformedName": "asm"
+  },
+  "__asm__": {
+    "type": "STRING",
+    "content": "__asm__",
+    "transformedName": "__asm__"
+  },
+  "__asm": {
+    "type": "STRING",
+    "content": "__asm",
+    "transformedName": "__asm"
+  },
+  "__volatile__": {
+    "type": "STRING",
+    "content": "__volatile__",
+    "transformedName": "__volatile__"
+  },
+  ".": {
+    "type": "STRING",
+    "content": ".",
+    "transformedName": "."
+  },
+  "->": {
+    "type": "STRING",
+    "content": "->",
+    "transformedName": "->"
+  },
+  "number_literal": {
+    "type": "COMPLEX",
+    "content": "Seq([Choice([Pattern(\"[-\\\\+]\", \"\"), Blank]), Choice([Pattern(\"0[xX]\", \"\"), Pattern(\"0[bB]\", \"\"), Blank]), Choice([Seq([Choice([Seq([Repeat(Pattern(\"[0-9]\", \"\")), Choice([Repeat(Seq([String(\"'\"), Repeat(Pattern(\"[0-9]\", \"\"))])), Blank])]), Seq([Pattern(\"0[bB]\", \"\"), Seq([Repeat(Pattern(\"[0-9]\", \"\")), Choice([Repeat(Seq([String(\"'\"), Repeat(Pattern(\"[0-9]\", \"\"))])), Blank])])]), Seq([Pattern(\"0[xX]\", \"\"), Seq([Repeat(Pattern(\"[0-9a-fA-F]\", \"\")), Choice([Repeat(Seq([String(\"'\"), Repeat(Pattern(\"[0-9a-fA-F]\", \"\"))])), Blank])])])]), Choice([Seq([String(\".\"), Choice([Seq([Repeat(Pattern(\"[0-9a-fA-F]\", \"\")), Choice([Repeat(Seq([String(\"'\"), Repeat(Pattern(\"[0-9a-fA-F]\", \"\"))])), Blank])]), Blank])]), Blank])]), Seq([String(\".\"), Seq([Repeat(Pattern(\"[0-9]\", \"\")), Choice([Repeat(Seq([String(\"'\"), Repeat(Pattern(\"[0-9]\", \"\"))])), Blank])])])]), Choice([Seq([Pattern(\"[eEpP]\", \"\"), Choice([Seq([Choice([Pattern(\"[-\\\\+]\", \"\"), Blank]), Seq([Repeat(Pattern(\"[0-9a-fA-F]\", \"\")), Choice([Repeat(Seq([String(\"'\"), Repeat(Pattern(\"[0-9a-fA-F]\", \"\"))])), Blank])])]), Blank])]), Blank]), Pattern(\"[uUlLwWfFbBdD]*\", \"\")])",
+    "transformedName": "number_literal"
+  },
+  "L'": {
+    "type": "STRING",
+    "content": "L'",
+    "transformedName": "L'"
+  },
+  "u'": {
+    "type": "STRING",
+    "content": "u'",
+    "transformedName": "u'"
+  },
+  "U'": {
+    "type": "STRING",
+    "content": "U'",
+    "transformedName": "U'"
+  },
+  "u8'": {
+    "type": "STRING",
+    "content": "u8'",
+    "transformedName": "u8'"
+  },
+  "'": {
+    "type": "STRING",
+    "content": "'",
+    "transformedName": "'"
+  },
+  "char_literal_token1": {
+    "type": "COMPLEX",
+    "content": "Metadata { params: MetadataParams { precedence: None, dynamic_precedence: 0, associativity: None, is_token: true, is_main_token: true, alias: None, field_name: None }, rule: Pattern(\"[^\\\\n']\", \"\") }",
+    "transformedName": "<character literal content>"
+  },
+  "L\"": {
+    "type": "STRING",
+    "content": "L\"",
+    "transformedName": "L\""
+  },
+  "u\"": {
+    "type": "STRING",
+    "content": "u\"",
+    "transformedName": "u\""
+  },
+  "U\"": {
+    "type": "STRING",
+    "content": "U\"",
+    "transformedName": "U\""
+  },
+  "u8\"": {
+    "type": "STRING",
+    "content": "u8\"",
+    "transformedName": "u8\""
+  },
+  "\"": {
+    "type": "STRING",
+    "content": "\"",
+    "transformedName": "\""
+  },
+  "string_literal_token1": {
+    "type": "COMPLEX",
+    "content": "Metadata { params: MetadataParams { precedence: Integer(1), dynamic_precedence: 0, associativity: None, is_token: true, is_main_token: true, alias: None, field_name: None }, rule: Pattern(\"[^\\\\\\\\\\\"\\\\n]+\", \"\") }",
+    "transformedName": "<string literal content>"
+  },
+  "escape_sequence": {
+    "type": "COMPLEX",
+    "content": "Metadata { params: MetadataParams { precedence: Integer(1), dynamic_precedence: 0, associativity: None, is_token: true, is_main_token: false, alias: None, field_name: None }, rule: Seq([String(\"\\\\\"), Choice([Pattern(\"[^xuU]\", \"\"), Pattern(\"\\\\d{2,3}\", \"\"), Pattern(\"x[0-9a-fA-F]{1,4}\", \"\"), Pattern(\"u[0-9a-fA-F]{4}\", \"\"), Pattern(\"U[0-9a-fA-F]{8}\", \"\")])]) }",
+    "transformedName": "escape_sequence"
+  },
+  "system_lib_string": {
+    "type": "COMPLEX",
+    "content": "Seq([String(\"<\"), Choice([Repeat(Choice([Pattern(\"[^>\\\\n]\", \"\"), String(\"\\\\>\")])), Blank]), String(\">\")])",
+    "transformedName": "system_lib_string"
+  },
+  "true": {
+    "type": "COMPLEX",
+    "content": "Choice([String(\"TRUE\"), String(\"true\")])",
+    "transformedName": "true"
+  },
+  "false": {
+    "type": "COMPLEX",
+    "content": "Choice([String(\"FALSE\"), String(\"false\")])",
+    "transformedName": "false"
+  },
+  "NULL": {
+    "type": "STRING",
+    "content": "NULL",
+    "transformedName": "NULL"
+  },
+  "nullptr": {
+    "type": "STRING",
+    "content": "nullptr",
+    "transformedName": "nullptr"
+  },
+  "identifier": {
+    "type": "PATTERN",
+    "content": "(\\p{XID_Start}|\\$|_|\\\\u[0-9A-Fa-f]{4}|\\\\U[0-9A-Fa-f]{8})(\\p{XID_Continue}|\\$|\\\\u[0-9A-Fa-f]{4}|\\\\U[0-9A-Fa-f]{8})*",
+    "transformedName": "identifier"
+  },
+  "comment": {
+    "type": "COMPLEX",
+    "content": "Choice([Seq([String(\"//\"), Pattern(\"(\\\\\\\\+(.|\\\\r?\\\\n)|[^\\\\\\\\\\\\n])*\", \"\")]), Seq([String(\"/*\"), Pattern(\"[^*]*\\\\*+([^/*][^*]*\\\\*+)*\", \"\"), String(\"/\")])])",
+    "transformedName": "comment"
+  }
+}
