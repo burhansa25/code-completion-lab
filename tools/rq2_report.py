@@ -89,6 +89,10 @@ def parsed_metric(row, key):
         if not 0 <= value <= 1:
             raise ValueError(f"Unexpected SequenceMatcher ratio outside [0,1]: {value}")
         value *= 100
+    elif key.startswith("sacrebleu_"):
+        if not -1e-9 <= value <= 100.0 + 1e-9:
+            raise ValueError(f"Unexpected {key} outside [0,100]: {value}")
+        value = max(0.0, min(100.0, value))
     elif not 0 <= value <= 100:
         raise ValueError(f"Unexpected {key} outside [0,100]: {value}")
     return value
