@@ -171,5 +171,63 @@ class PilotProtocolTests(unittest.TestCase):
                                   '--output-root',str(out)])
 
 
+    def test_study_is_disjoint_from_frozen_pilot_and_deterministic(self):
+        from benchmark_v2.pilot import stratified_study
+        with tempfile.TemporaryDirectory() as d:
+            sources = self.setup_fixture(Path(d), n=18)
+            pilot = stratified_pilot('c', sources, size=6, seed=2026)
+            a, base = stratified_study('c', sources, size=9, seed=2027)
+            b, _ = stratified_study('c', list(reversed(sources)), size=9, seed=2027)
+            ids = lambda groups: {c['case_id'] for _, items in groups for c in items}
+            self.assertEqual(ids(pilot), ids(base))
+            self.assertEqual(ids(a), ids(b))
+            self.assertEqual(len(ids(a)), 9)
+            self.assertFalse(ids(a) & ids(pilot))
+            with self.assertRaises(ValueError):
+                stratified_study('c', sources, size=13, seed=2027)
+            with self.assertRaises(ValueError):
+                stratified_study('c', sources, size=121, seed=2027)
+
+    def test_study_cli_frozen_manifest_provider_parity_and_budget(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            sources = self.setup_fixture(root, n=19)
+            out = root / 'results/v2'
+            with patch.object(cli, 'REPO', root), patch.object(cli, 'discover_sources', return_value=sources):
+                for model in ('grok', 'gpt'):
+                    self.assertEqual(cli.main('c', [
+                        '--scope', 'study', '--study-size', '8', '--study-seed', '2027',
+                        '--stage', 'prepare', '--model', model,
+                        '--output-root', str(out)]), 0)
+                paths = sorted(out.rglob('cohort.json'))
+                self.assertEqual(len(paths), 2)
+                manifests = [json.loads(p.read_text()) for p in paths]
+                self.assertEqual({x['selection_sha256'] for x in manifests},
+                                 {manifests[0]['selection_sha256']})
+                self.assertEqual(len(manifests[0]['selected']), 8)
+                self.assertEqual(len(manifests[0]['excluded_pilot_case_ids']), 6)
+                self.assertEqual({x['excluded_pilot_selection_sha256'] for x in manifests},
+                                 {manifests[0]['excluded_pilot_selection_sha256']})
+                selected = {x['case_id'] for x in manifests[0]['selected']}
+                excluded = set(manifests[0]['excluded_pilot_case_ids'])
+                self.assertFalse(selected & excluded)
+                self.assertEqual(len(list(out.rglob('cases.jsonl'))), 16)
+                with self.assertRaises(SystemExit):
+                    cli.main('c', ['--scope', 'study', '--study-size', '8',
+                                   '--study-seed', '2027', '--stage', 'run',
+                                   '--model', 'grok', '--yes', '--max-api-requests', '50',
+                                   '--output-root', str(out)])
+                with self.assertRaises(SystemExit):
+                    cli.main('c', ['--scope', 'study', '--study-size', '8',
+                                   '--study-seed', '2027', '--stage', 'run',
+                                   '--model', 'grok', '--output-root', str(out)])
+                with self.assertRaises(SystemExit):
+                    cli.main('c', ['--scope', 'study', '--study-size', '121',
+                                   '--stage', 'prepare', '--output-root', str(out)])
+                with self.assertRaises(SystemExit):
+                    cli.main('c', ['--scope', 'pilot', '--study-size', '7',
+                                   '--stage', 'prepare', '--output-root', str(out)])
+
+
 if __name__ == '__main__':
     unittest.main()

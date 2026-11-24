@@ -34,8 +34,8 @@ def c_batch_dir(outroot, custom=None):
 
 def discover_sources(lang, scope, c_batch, sb_input):
     if lang == "smallbasic":
-        # Full/pilot reuse the previously mapped 27 paired HJ Small Basic files.
-        default = "sb-full" if scope in {"pilot", "full"} else "sb-smoke"
+        # Full/pilot/study reuse the mapped 27 paired HJ Small Basic files.
+        default = "sb-full" if scope in {"pilot", "study", "full"} else "sb-smoke"
         path = Path(sb_input).expanduser().resolve() if sb_input else REPO / f"results/{default}/cases_mapped.jsonl"
         if not path.is_file():
             raise FileNotFoundError(f"Mapped Small Basic cases missing: {path}. Run legacy preparation first.")
@@ -123,10 +123,20 @@ def safe_write_cohort(path, groups, config):
                 "reference_retrieval_rank": ref.get("retrieval_rank"),
             })
     manifest = {"selection_schema": 1,
-                "method": "stratified_lexical_source_diversity_pre-registered" if config["scope"] == "pilot" else config["scope"],
+                "method": "stratified_lexical_source_diversity_pre-registered" if config["scope"] == "pilot"
+                          else "held_out_lexical_file_diversity" if config["scope"] == "study"
+                          else config["scope"],
                 "pilot_size": config.get("pilot_size"), "pilot_seed": config.get("pilot_seed"),
                 "selected": cohorts,
                 "selection_sha256": sha_obj(cohorts)}
+    if config["scope"] == "study":
+        manifest.update({
+            "study_size": config["study_size"], "study_seed": config["study_seed"],
+            "excluded_pilot_seed": 2026, "excluded_pilot_size": 6,
+            "excluded_pilot_selection_sha256": config["excluded_pilot_selection_sha256"],
+            "excluded_pilot_case_ids": config["excluded_pilot_case_ids"],
+            "warning": "Balanced lexical/file-diverse cohort; not a probability sample."
+        })
     content = json.dumps(manifest, indent=2, ensure_ascii=False) + "\n"
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.is_file():
@@ -159,13 +169,15 @@ def report_group(runroot, groups, *, ideal_reps, plots, retrieval_sources=()):
 def main(language, argv=None):
     p = argparse.ArgumentParser(description="Code Completion Lab v2 - RQ2 3+3+3 experiment")
     p.add_argument("--model", default="grok", choices=[*MODELS, "gpt"])
-    p.add_argument("--scope", choices=["smoke", "pilot", "full"], default="smoke")
+    p.add_argument("--scope", choices=["smoke", "pilot", "study", "full"], default="smoke")
     p.add_argument("--stage", choices=["prepare", "run", "all", "report"], default="all")
     p.add_argument("--context", choices=["last10", "full"], default="last10")
     p.add_argument("--completion", choices=["prefix", "infill"], default="prefix")
     p.add_argument("--profile", choices=["fragment-v1", "lab", "monir-style"], default="fragment-v1")
     p.add_argument("--pilot-size", type=int, default=6, help="1-32 representative cursors (pilot scope only)")
     p.add_argument("--pilot-seed", type=int, default=2026, help="Reproducible selection across providers")
+    p.add_argument("--study-size", type=int, default=30, help="1-120 held-out study cursors per language")
+    p.add_argument("--study-seed", type=int, default=2027, help="Frozen study cohort seed")
     p.add_argument("--max-api-requests", type=int, default=200, help="Hard request budget; never exceed")
     p.add_argument("--top-k", choices=[3, 10, 20], type=int, default=3)
     p.add_argument("--ideal-repetitions", choices=[1, 3], type=int, default=3)
@@ -178,7 +190,7 @@ def main(language, argv=None):
     p.add_argument("--c-batch-dir", type=Path)
     p.add_argument("--sb-input", type=Path)
     p.add_argument("--dry-run", action="store_true")
-    p.add_argument("--yes", action="store_true", help="Explicit authorization for pilot/full paid API calls")
+    p.add_argument("--yes", action="store_true", help="Explicit authorization for pilot/study/full paid API calls")
     p.add_argument("--allow-topk-full", action="store_true")
     p.add_argument("--allow-unverified-fim", action="store_true")
     p.add_argument("--no-plots", action="store_true")
@@ -197,21 +209,35 @@ def main(language, argv=None):
         p.error("Top-10/20 full run disabled until stratified experiment is planned: --allow-topk-full")
     if args.max_api_requests < 1:
         p.error("--max-api-requests must be positive")
-    if args.scope in {"pilot", "full"} and args.stage in {"run", "all"} and not args.yes:
+    if args.scope in {"pilot", "study", "full"} and args.stage in {"run", "all"} and not args.yes:
         p.error("Pilot/full API runs require explicit --yes")
     if args.scope == "pilot" and not 1 <= args.pilot_size <= 32:
         p.error("--pilot-size must be 1-32")
+    if args.scope == "study" and not 1 <= args.study_size <= 120:
+        p.error("--study-size must be 1-120")
+    if args.scope != "study" and (args.study_size != 30 or args.study_seed != 2027):
+        p.error("--study-size and --study-seed require --scope study")
     if args.scope != "pilot" and (args.pilot_size != 6 or args.pilot_seed != 2026):
         p.error("--pilot-size and --pilot-seed require --scope pilot")
     model_name, model = resolve_model(args.model)
     sources = discover_sources(language, args.scope,
                                c_batch_dir(args.output_root, args.c_batch_dir), args.sb_input)
+    pilot_groups = None
     if args.scope == "pilot":
         if args.cursor is not None:
             p.error("--cursor is not compatible with --scope pilot")
         from .pilot import stratified_pilot
         groups = stratified_pilot(language, sources, size=args.pilot_size,
                                   seed=args.pilot_seed, top_k=args.top_k)
+    elif args.scope == "study":
+        if args.cursor is not None:
+            p.error("--cursor is not compatible with --scope study")
+        if args.profile != "fragment-v1" or args.completion != "prefix" or args.top_k != 3:
+            p.error("Frozen study cohort requires --profile fragment-v1 --completion prefix --top-k 3")
+        from .pilot import stratified_study
+        groups, pilot_groups = stratified_study(language, sources,
+                                               size=args.study_size, seed=args.study_seed,
+                                               top_k=args.top_k)
     else:
         groups = select_cases(language, sources, args.scope, args.cursor, args.top_k,
                               include_byte0=args.include_byte0)
@@ -224,6 +250,16 @@ def main(language, argv=None):
               "pilot_size": args.pilot_size if args.scope == "pilot" else None,
               "pilot_seed": args.pilot_seed if args.scope == "pilot" else None,
               "schema": "v2-rq2-2"}
+    if pilot_groups is not None:
+        # Hash the same manifest columns and order used by frozen pilot results.
+        excluded_rows = [{"source": name, "case_id": c["case_id"],
+                          "cursor_byte": c["cursor_byte"],
+                          "reference_kind_lexical": text_kind(c["references"][0]["text"]),
+                          "reference_retrieval_rank": c["references"][0].get("retrieval_rank")}
+                         for name, items in pilot_groups for c in items]
+        config.update({"study_size": args.study_size, "study_seed": args.study_seed,
+                       "excluded_pilot_selection_sha256": sha_obj(excluded_rows),
+                       "excluded_pilot_case_ids": [c["case_id"] for row, items in pilot_groups for c in items]})
     # Keep experiment runs isolated across implementation revisions. Do not
     # mix generated outputs from different prompt/evaluation source versions.
     code_names = ("benchmark_v2/cases.py", "benchmark_v2/cli.py",
@@ -257,9 +293,9 @@ def main(language, argv=None):
         prepared.append((case_path, dirname))
     if not prepared:
         raise ValueError("No eligible prepared cases")
-    if args.scope == "pilot" and not args.dry_run:
+    if args.scope in {"pilot", "study"} and not args.dry_run:
         manifest = safe_write_cohort(root / "cohort.json", groups, config)
-        print(f"Pilot selection frozen: {len(manifest['selected'])} cursors | "
+        print(f"{args.scope.title()} selection frozen: {len(manifest['selected'])} cursors | "
               f"SHA-256 {manifest['selection_sha256'][:16]} | {root / 'cohort.json'}")
     print(f"Run ID {run_id} | {language} | {model_name} | {args.scope} | {len(prepared)} files | {total:,} planned API calls")
     print(f"Output: {root}")

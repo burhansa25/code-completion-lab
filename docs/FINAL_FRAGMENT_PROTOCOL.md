@@ -79,3 +79,34 @@ cp run_smallbasic_v2.py run_smallbasic.py
 ```
 
 Do not delete `benchmark_entry.py` or legacy provider files as part of this change; they remain accessible to reproduce the historical six-task protocol, though no longer called by the primary entrypoints. Keep a Git tag to locate the last v1 runner checkpoint if necessary.
+
+## 7. Held-out main-study cohort (after the exploratory pilot)
+
+The research run is named `--scope study`; **never use `--scope full` to mean a
+small sample**. The default study cohort uses 30 cases per language and seed
+2027. It reconstructs and excludes the frozen six-case pilot (`size=6, seed=2026`)
+from the same prepared corpus, irrespective of model or the presence of saved
+pilot results. A new `cohort.json` stores selected IDs, lexical strata,
+selection SHA-256, and the excluded pilot SHA-256. Use equal study seed and
+input data for GPT-4o and Grok; both must yield the same selection hash.
+
+Sampling is **deterministic and balanced by lexical reference shape/file**,
+not a simple random or probability-proportional sample. Therefore the study
+estimates describe the chosen cohort, not necessarily all HJ positions. The
+30-case initial size is a pragmatic research batch, not a statistical power
+calculation. Report paired per-cursor differences and confidence intervals,
+with uncertainty assessed at the source-file cluster level when relevant.
+Do not use the same six pilot positions to choose prompt changes for the
+held-out study. Exact reference boundaries are not AST-certified.
+
+```bash
+# Only prepares inputs and manifests; 0 API calls.
+python run_c.py --scope study --study-size 30 --study-seed 2027 --stage prepare --model grok
+python run_c.py --scope study --study-size 30 --study-seed 2027 --stage prepare --model gpt
+python run_smallbasic.py --scope study --study-size 30 --study-seed 2027 --stage prepare --model grok
+python run_smallbasic.py --scope study --study-size 30 --study-seed 2027 --stage prepare --model gpt
+
+# Examine the frozen manifests and API cost before any model calls.
+# Each study run plans 30 * 9 = 270 requests, which exceeds the default 200
+# request safety cap. Execution requires explicit --yes AND an increased cap.
+```

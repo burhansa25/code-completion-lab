@@ -63,23 +63,22 @@ def pilot_candidates(language, sources, top_k):
             yield true_source_name, case, kind
 
 
-def stratified_pilot(language, sources, *, size=6, seed=2026, top_k=3):
-    """Select unique cursor cases across lexical strata and files, deterministically.
-
-    The same input/seed yields identical case IDs for every LLM provider.
-    Strata are lexical *proxies*, not verified AST labels. This is a pilot only.
-    """
-    if not 1 <= size <= 32:
-        raise ValueError("Pilot size must be between 1 and 32")
+def _stratified_groups(language, sources, *, size, seed, top_k, exclude=(), max_size=32):
+    """Deterministic lexical/file-diverse selection, with optional held-out exclusions."""
+    if not 1 <= size <= max_size:
+        raise ValueError(f"Cohort size must be between 1 and {max_size}")
     if not 0 <= seed <= 2 ** 32 - 1:
         raise ValueError("Pilot seed must be a nonnegative 32-bit integer")
     buckets = {k: [] for k in STRATA}
     seen = set()
+    excluded = set(exclude)
     for name, case, kind in pilot_candidates(language, sources, top_k):
         identity = (name, int(case["cursor_byte"]))
         if identity in seen:
             raise ValueError(f"Duplicate pilot cursor: {identity}")
         seen.add(identity)
+        if (name, case["case_id"], int(case["cursor_byte"])) in excluded:
+            continue
         buckets.setdefault(kind, []).append((name, case))
 
     def stable_score(item):
@@ -111,8 +110,33 @@ def stratified_pilot(language, sources, *, size=6, seed=2026, top_k=3):
             if not changed:
                 break
     if len(selected) < size:
-        raise ValueError(f"Only {len(selected)} eligible pilot cursors; requested {size}")
+        raise ValueError(f"Only {len(selected)} eligible held-out cursors; requested {size}")
     by_source = {}
     for name, case in selected:
         by_source.setdefault(name, []).append(case)
     return list(by_source.items())
+
+
+def stratified_pilot(language, sources, *, size=6, seed=2026, top_k=3):
+    """Select an exploratory cohort; sample is not population-representative."""
+    return _stratified_groups(language, sources, size=size, seed=seed,
+                              top_k=top_k, max_size=32)
+
+
+def stratified_study(language, sources, *, size=30, seed=2027, top_k=3):
+    """Select a held-out study cohort, excluding the frozen primary pilot.
+
+    Reconstruct the original six-cursor pilot directly from its public seed,
+    not from model-specific result folders. This guarantees the same exclusion
+    when an independent user prepares the same corpus from a fresh clone.
+    Return (study_groups, excluded_pilot_groups) for auditability.
+    """
+    if not 1 <= size <= 120:
+        raise ValueError("Study size must be between 1 and 120")
+    pilot_groups = stratified_pilot(language, sources, size=6, seed=2026,
+                                    top_k=top_k)
+    excluded = {(name, c["case_id"], int(c["cursor_byte"]))
+                for name, items in pilot_groups for c in items}
+    study_groups = _stratified_groups(language, sources, size=size, seed=seed,
+                                       top_k=top_k, exclude=excluded, max_size=120)
+    return study_groups, pilot_groups
