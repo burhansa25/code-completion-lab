@@ -16,6 +16,51 @@ PUNCTUATION = re.compile(r"^[^\w\s]+$")
 IDENT_BYTE = frozenset(b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_")
 
 
+def c_lexical_context_at(source, end):
+    """Return a conservative C lexical context just before byte offset ``end``.
+
+    Only used after a possible identifier-boundary warning. Comments and quoted
+    text may contain adjacent letters without representing a split C identifier.
+    This is a scanner for *diagnostics*, not a Tree-sitter grammar validator.
+    """
+    if not 0 <= end <= len(source):
+        raise ValueError("C lexical context offset is outside the source")
+    state = "code"
+    i = 0
+    while i < end:
+        byte = source[i]
+        next_byte = source[i + 1] if i + 1 < end else None
+        if state == "code":
+            if byte == 47 and next_byte == 47:  # //
+                state = "line_comment"
+                i += 2
+                continue
+            if byte == 47 and next_byte == 42:  # /*
+                state = "block_comment"
+                i += 2
+                continue
+            if byte == 34:  # double quote
+                state = "string_literal"
+            elif byte == 39:  # single quote
+                state = "character_literal"
+        elif state == "line_comment":
+            if byte in (10, 13):  # newline
+                state = "code"
+        elif state == "block_comment":
+            if byte == 42 and next_byte == 47:  # */
+                state = "code"
+                i += 2
+                continue
+        elif state in ("string_literal", "character_literal"):
+            if byte == 92:  # escaped next byte, including escaped quote
+                i += 2
+                continue
+            if (state == "string_literal" and byte == 34) or (state == "character_literal" and byte == 39):
+                state = "code"
+        i += 1
+    return state
+
+
 def _sha(data):
     return hashlib.sha256(data).hexdigest()
 
@@ -217,8 +262,22 @@ def inspect_case(case, source_cache, report_cache):
                     following = source[end]
                     previous = source[end - 1] if end > 0 else None
                     if following in IDENT_BYTE and previous in IDENT_BYTE:
-                        row["after_span"] = "inside_identifier"
-                        issues.append("reference_ends_inside_identifier")
+                        # A byte-level letter/letter boundary is not sufficient to
+                        # identify a C identifier: it may lie within a comment or
+                        # a string/character literal. Preserve these as audit notes.
+                        if case.get("language") == "c":
+                            context = c_lexical_context_at(source, end)
+                        else:
+                            context = "code"
+                        if context in ("line_comment", "block_comment"):
+                            row["after_span"] = "inside_comment"
+                            notes.append("lexical_word_continues_in_comment")
+                        elif context in ("string_literal", "character_literal"):
+                            row["after_span"] = "inside_quoted_literal"
+                            notes.append("lexical_word_continues_in_quoted_literal")
+                        else:
+                            row["after_span"] = "inside_identifier"
+                            issues.append("reference_ends_inside_identifier")
                     elif following in b" \t\n\r":
                         row["after_span"] = "whitespace"
                     elif following in IDENT_BYTE:

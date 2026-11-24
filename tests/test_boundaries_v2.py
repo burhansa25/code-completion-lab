@@ -11,7 +11,8 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from benchmark_v2.boundaries import (inspect_case, text_kind, discover_inputs,
-                                     audit_prepared, _reference_in_report)
+                                     audit_prepared, _reference_in_report,
+                                     c_lexical_context_at)
 from benchmark_v2.__main__ import main
 
 
@@ -83,6 +84,71 @@ class BoundaryTests(unittest.TestCase):
         mod = dict(self.case, references=[dict(self.ref, text='in', end_byte_from_text=self.offset+2)])
         row = self.audit_row(mod)
         self.assertIn('reference_ends_inside_identifier', row['issues'])
+
+    def custom_fragment(self, prefix, reference, suffix, language="c"):
+        """Build a fully hash-consistent case for a lexical context example."""
+        source = self.base / "fragment.c"
+        source.write_text(prefix + reference + suffix, encoding="utf-8")
+        offset = len(prefix.encode("utf-8"))
+        end = offset + len(reference.encode("utf-8"))
+        report_path = self.base / "fragment.json"
+        report_path.write_text(json.dumps({str(offset): [
+            {"candidate_text": reference, "candidate": "fragment", "state_id": 123}
+        ]}), encoding="utf-8")
+        return self.audit_row(dict(self.case, language=language,
+            source_path=str(source), source_sha256=sha(source.read_bytes()),
+            reference_path=str(report_path), reference_sha256=sha(report_path.read_bytes()),
+            cursor_byte=offset, prefix=prefix,
+            references=[{"structure":"fragment", "text":reference,
+                         "start_byte":offset, "end_byte_from_text":end,
+                         "collection_state_id":123,"retrieval_rank":2}],
+            top_candidates=[{"structure":"static"},{"structure":"fragment"},{"structure":"other"}]))
+
+    def test_line_comment_word_is_not_c_identifier_issue(self):
+        row = self.custom_fragment("// If the s ", "str", "ing contains more characters\n")
+        self.assertEqual(row["after_span"], "inside_comment")
+        self.assertNotIn("reference_ends_inside_identifier", row["issues"])
+        self.assertIn("lexical_word_continues_in_comment", row["notes"])
+        self.assertEqual(row["slice_verified"], "yes")
+        self.assertEqual(row["report_verified"], "yes")
+        self.assertEqual(row["boundary_confirmed"], "no")
+
+    def test_block_comment_word_is_not_c_identifier_issue(self):
+        row = self.custom_fragment("/* Par", "t", "ial description */ int main(void);")
+        self.assertEqual(row["after_span"], "inside_comment")
+        self.assertFalse(row["issues"])
+
+    def test_string_escape_followed_by_letters_is_not_identifier(self):
+        row = self.custom_fragment('printf("Fahr', r"\t", 'Celsius\\n");')
+        self.assertEqual(row["after_span"], "inside_quoted_literal")
+        self.assertIn("lexical_word_continues_in_quoted_literal", row["notes"])
+        self.assertFalse(row["issues"])
+
+    def test_string_with_comment_markers_remains_string(self):
+        row = self.custom_fragment('printf("// Par', 't', 'ial /* still string */");')
+        self.assertEqual(row["after_span"], "inside_quoted_literal")
+        self.assertFalse(row["issues"])
+
+    def test_real_split_identifier_is_still_flagged(self):
+        row = self.custom_fragment("int ", "pr", "int_value = 1;")
+        self.assertEqual(row["after_span"], "inside_identifier")
+        self.assertIn("reference_ends_inside_identifier", row["issues"])
+
+    def test_comment_end_then_real_identifier_is_flagged(self):
+        row = self.custom_fragment("/* comment */ int ", "pr", "int_value = 1;")
+        self.assertEqual(row["after_span"], "inside_identifier")
+        self.assertIn("reference_ends_inside_identifier", row["issues"])
+
+    def test_lexical_context_scanner_respects_escaped_quotes_and_newlines(self):
+        text = (b'printf("escaped ' + bytes((92, 34)) + b'quote' + bytes((92, 34))
+                + b' and // marker");\n// comment\nint value;')
+        self.assertEqual(c_lexical_context_at(text, text.index(b'// marker') + 5), "string_literal")
+        self.assertEqual(c_lexical_context_at(text, text.index(b'// comment') + 6), "line_comment")
+        self.assertEqual(c_lexical_context_at(text, len(text)), "code")
+
+    def test_lexical_context_scanner_rejects_invalid_offsets(self):
+        with self.assertRaises(ValueError):
+            c_lexical_context_at(b"abc", 4)
 
     def test_end_byte_mismatch_detected(self):
         mod = dict(self.case, references=[dict(self.ref, end_byte_from_text=self.offset+7)])
