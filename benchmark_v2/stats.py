@@ -121,6 +121,10 @@ def export_stats(rows, path):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("x", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=list(rows[0]))
+        writer = csv.DictWriter(
+            f,
+            fieldnames=list(rows[0]),
+            lineterminator="\n",
+        )
         writer.writeheader()
         writer.writerows(rows)
