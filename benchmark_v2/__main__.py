@@ -118,25 +118,61 @@ def main(argv=None):
     res.add_argument("--paths", action="store_true", help="Print source CSV paths and prompt profiles")
     audit = sub.add_parser("audit", help="Inspect saved predictions and normalize Markdown for secondary analysis")
     audit.add_argument("--root", type=Path, default=Path("results/v2"))
-    audit.add_argument("--language", choices=["c", "smallbasic"], required=True)
+    audit.add_argument("--language", choices=["c", "smallbasic", "all"], required=True)
     audit.add_argument("--model", required=True, help="Provider alias: grok, gpt or gpt4o")
     audit.add_argument("--scope", choices=["smoke", "full"], default="smoke")
     audit.add_argument("--run-id", help="Select an exact existing run ID")
     audit.add_argument("--limit-cases", type=int, default=3)
     audit.add_argument("--show-predictions", action="store_true")
     audit.add_argument("--show-prompts", action="store_true")
+    boundaries = sub.add_parser("boundaries", help="Audit HJ reference provenance and span boundaries without LLM calls")
+    boundaries.add_argument("--language", choices=["c", "smallbasic", "all"], required=True)
+    boundaries.add_argument("--input", type=Path, action="append", default=[],
+                            help="Prepared JSONL file or directory; repeatable")
+    boundaries.add_argument("--root", type=Path, default=Path("results"),
+                            help="Base results path used for automatic discovery")
+    boundaries.add_argument("--limit", type=int, default=8,
+                            help="How many example rows to print (0 hides details)")
+    boundaries.add_argument("--export", type=Path, help="Optional new CSV path (never overwrites)")
     args = p.parse_args(argv)
     if args.command == "results":
         return print_results(args.root, args.metric, args.aggregation, args.scope, args.all_runs, args.paths)
     if args.command == "audit":
         from .audit import audit_run
-        try:
-            return audit_run(args.root, args.language, args.model, args.scope, args.run_id,
-                             limit_cases=args.limit_cases,
-                             show_predictions=args.show_predictions,
-                             show_prompts=args.show_prompts)
-        except (OSError, ValueError, KeyError) as exc:
-            p.error(str(exc))
+        languages = ["c", "smallbasic"] if args.language == "all" else [args.language]
+        models = ["grok", "gpt"] if args.model == "all" else [args.model]
+        if args.run_id and len(languages) * len(models) != 1:
+            p.error("--run-id requires a single language and model")
+        status = 0
+        for language in languages:
+            for model in models:
+                try:
+                    status = max(status, audit_run(args.root, language, model, args.scope, args.run_id,
+                                                   limit_cases=args.limit_cases,
+                                                   show_predictions=args.show_predictions,
+                                                   show_prompts=args.show_prompts))
+                except (OSError, ValueError, KeyError) as exc:
+                    if len(languages) * len(models) == 1:
+                        p.error(str(exc))
+                    print(f"WARNING: audit unavailable for {language}/{model}: {exc}")
+                    status = 1
+        return status
+    if args.command == "boundaries":
+        from .boundaries import audit_prepared
+        languages = ["c", "smallbasic"] if args.language == "all" else [args.language]
+        if len(languages) > 1 and (args.input or args.export):
+            p.error("For --language all, omit --input and --export; run each language separately to override paths/export")
+        status = 0
+        for language in languages:
+            try:
+                status = max(status, audit_prepared(language, args.input, root=args.root,
+                                                    limit=args.limit, export=args.export))
+            except (OSError, ValueError, KeyError) as exc:
+                if len(languages) == 1:
+                    p.error(str(exc))
+                print(f"WARNING: boundaries unavailable for {language}: {exc}")
+                status = 1
+        return status
     return 2
 
 
