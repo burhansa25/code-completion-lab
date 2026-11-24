@@ -116,9 +116,27 @@ def main(argv=None):
     res.add_argument("--scope", choices=["smoke", "full", "all"], default="all")
     res.add_argument("--all-runs", action="store_true", help="Include superseded runs")
     res.add_argument("--paths", action="store_true", help="Print source CSV paths and prompt profiles")
+    audit = sub.add_parser("audit", help="Inspect saved predictions and normalize Markdown for secondary analysis")
+    audit.add_argument("--root", type=Path, default=Path("results/v2"))
+    audit.add_argument("--language", choices=["c", "smallbasic"], required=True)
+    audit.add_argument("--model", required=True, help="Provider alias: grok, gpt or gpt4o")
+    audit.add_argument("--scope", choices=["smoke", "full"], default="smoke")
+    audit.add_argument("--run-id", help="Select an exact existing run ID")
+    audit.add_argument("--limit-cases", type=int, default=3)
+    audit.add_argument("--show-predictions", action="store_true")
+    audit.add_argument("--show-prompts", action="store_true")
     args = p.parse_args(argv)
     if args.command == "results":
         return print_results(args.root, args.metric, args.aggregation, args.scope, args.all_runs, args.paths)
+    if args.command == "audit":
+        from .audit import audit_run
+        try:
+            return audit_run(args.root, args.language, args.model, args.scope, args.run_id,
+                             limit_cases=args.limit_cases,
+                             show_predictions=args.show_predictions,
+                             show_prompts=args.show_prompts)
+        except (OSError, ValueError, KeyError) as exc:
+            p.error(str(exc))
     return 2
 
 
