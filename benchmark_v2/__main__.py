@@ -125,6 +125,16 @@ def main(argv=None):
     audit.add_argument("--limit-cases", type=int, default=3)
     audit.add_argument("--show-predictions", action="store_true")
     audit.add_argument("--show-prompts", action="store_true")
+    stats = sub.add_parser("stats", help="Read-only paired Top-1 effect with file-cluster bootstrap CI")
+    stats.add_argument("--root", type=Path, default=Path("results/v2"))
+    stats.add_argument("--scope", choices=["pilot", "study", "full"], default="study")
+    stats.add_argument("--metric", choices=["unigram", "sequence", "bleu", "all"], default="all")
+    stats.add_argument("--language", choices=["c", "smallbasic", "all"], default="all")
+    stats.add_argument("--model", choices=["grok", "gpt", "gpt4o", "all"], default="all")
+    stats.add_argument("--bootstrap", type=int, default=5000)
+    stats.add_argument("--seed", type=int, default=2027)
+    stats.add_argument("--all-runs", action="store_true")
+    stats.add_argument("--export", type=Path, help="Optional new CSV path (never overwrites)")
     boundaries = sub.add_parser("boundaries", help="Audit HJ reference provenance and span boundaries without LLM calls")
     boundaries.add_argument("--language", choices=["c", "smallbasic", "all"], required=True)
     boundaries.add_argument("--input", type=Path, action="append", default=[],
@@ -137,6 +147,20 @@ def main(argv=None):
     args = p.parse_args(argv)
     if args.command == "results":
         return print_results(args.root, args.metric, args.aggregation, args.scope, args.all_runs, args.paths)
+    if args.command == "stats":
+        from .stats import collect_stats, print_stats, export_stats
+        try:
+            rows = collect_stats(args.root, scope=args.scope, metric=args.metric,
+                                 bootstrap=args.bootstrap, seed=args.seed,
+                                 language=args.language, model=args.model,
+                                 all_runs=args.all_runs)
+            print_stats(rows)
+            if args.export:
+                export_stats(rows, args.export)
+                print(f"Saved: {args.export}")
+            return 0
+        except (OSError, ValueError, KeyError) as exc:
+            p.error(str(exc))
     if args.command == "audit":
         from .audit import audit_run
         languages = ["c", "smallbasic"] if args.language == "all" else [args.language]

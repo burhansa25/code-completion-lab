@@ -57,10 +57,9 @@ class CaseFixture(unittest.TestCase):
             x = self.make_c(Path(d))
             full = cases.prepare_case(x, context="full")
             self.assertIn("line_0", full["conditions"][0]["prompt"])
-            mock_c = types.ModuleType("run_hj_c_batch")
-            mock_c.PREFIX_SUFFIX = "FIM: "
-            with patch.dict(sys.modules, {"run_hj_c_batch": mock_c}):
-                infill = cases.prepare_case(x, context="full", completion="infill")
+            infill = cases.prepare_case(x, context="full", completion="infill")
+            from benchmark_v2.prompts import PREFIX_SUFFIX
+            self.assertTrue(infill["conditions"][0]["prompt"].startswith(PREFIX_SUFFIX))
             self.assertIn("SUFFIX START", infill["conditions"][0]["prompt"])
             self.assertIn("return 0;", infill["conditions"][0]["prompt"])
             self.assertIn('("Hello");', x["references"][0]["text"])
@@ -79,22 +78,20 @@ class CaseFixture(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "modified"):
                 cli.verify_prepared_cases(path)
 
-    def test_exact_c_fim_parity_with_legacy(self):
-        # On the actual WSL repo this imports the real frozen legacy function.
-        try:
-            from run_hj_c_batch import make_infill
-        except ImportError:
-            self.skipTest("Legacy C runner not present in isolated patch directory")
-        from tools.check_v2_parity import compare
+    def test_frozen_c_fim_prompt_and_source_slice(self):
+        from benchmark_v2.prompts import PREFIX_SUFFIX
+        from prepare_c_batch import make_infill
         import copy
         with tempfile.TemporaryDirectory() as d:
-            original = self.make_c(Path(d))
-            original["conditions"] = [{"condition": "without_guidance", "structure": None, "prompt": ""}]
-            original["conditions"] += [{"condition": f"guided_rank_{idx}", "structure": item["structure"], "prompt": ""}
-                                       for idx, item in enumerate(original["top_candidates"], 1)]
-            old = make_infill(copy.deepcopy(original), Path(original["source_path"]).read_bytes(), original["references"][0])
-            y = cases.prepare_case(original, context="full", completion="infill", profile="lab")
-            self.assertTrue(compare(old, y))
+            case = self.make_c(Path(d))
+            case["conditions"] = [{"condition": "without_guidance", "structure": None, "prompt": ""}]
+            case["conditions"] += [{"condition": f"guided_rank_{idx}", "structure": item["structure"], "prompt": ""}
+                                   for idx, item in enumerate(case["top_candidates"], 1)]
+            old = make_infill(copy.deepcopy(case), Path(case["source_path"]).read_bytes(), case["references"][0])
+            new = cases.prepare_case(case, context="full", completion="infill", profile="lab")
+            for previous, current in zip(old["conditions"], new["conditions"]):
+                self.assertEqual(previous["prompt"], current["prompt"])
+            self.assertTrue(new["conditions"][0]["prompt"].startswith(PREFIX_SUFFIX))
 
     def test_c_source_integrity(self):
         with tempfile.TemporaryDirectory() as d:
@@ -118,9 +115,7 @@ class CaseFixture(unittest.TestCase):
                   "token_mapping_sha256": hashlib.sha256(mapping_path.read_bytes()).hexdigest()}
             mapper = types.ModuleType("map_hj_candidates")
             mapper.map_structure = lambda s, mapping: (s.replace("Stmt_token1", "("), [])
-            prompts = types.ModuleType("hj_benchmark_tools")
-            prompts.make_prompt = lambda prefix, structure: f"Prefix: {prefix}\nStructure: {structure or 'none'}"
-            with patch.dict(sys.modules, {"map_hj_candidates": mapper, "hj_benchmark_tools": prompts}):
+            with patch.dict(sys.modules, {"map_hj_candidates": mapper}):
                 y = cases.prepare_case(sb)
             self.assertEqual(y["conditions"][-1]["structure"], "( Exprs")
             self.assertEqual(y["planned_api_requests"], 9)

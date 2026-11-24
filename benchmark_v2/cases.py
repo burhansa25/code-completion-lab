@@ -117,11 +117,11 @@ def build_prompt(case, prefix, suffix, structure, *, profile, completion):
     language = case["language"]
     if profile == "lab":
         if language == "smallbasic":
-            from hj_benchmark_tools import make_prompt
+            from .prompts import make_prompt
             return make_prompt(prefix, structure)
         if completion == "infill":
-            # Same frozen C FIM template as run_hj_c_batch.py.
-            from run_hj_c_batch import PREFIX_SUFFIX
+            # Same frozen C FIM template, moved out of the former provider runner.
+            from .prompts import PREFIX_SUFFIX
             base = (PREFIX_SUFFIX + f"PREFIX START\n{prefix}\nPREFIX END\n\n"
                     f"SUFFIX START\n{suffix}\nSUFFIX END\n")
             return (base + f"\nRequired continuation structure:\n{structure}\n" if structure is not None

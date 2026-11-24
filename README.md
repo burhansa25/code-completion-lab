@@ -1,267 +1,151 @@
-# Code Completion Lab Benchmark
+# Code Completion Lab
 
-This project evaluates C and Microsoft Small Basic completions with and without candidate guidance from the HJ Tree-sitter pipeline. For each selected cursor position, the runner generates three completions without guidance and one completion for each of the three highest-ranked HJ candidates.
+Reproducible **HJ grammar-guided code-fragment completion** benchmark for **C** and **Microsoft Small Basic**. Two entrypoints use a shared generation/scoring engine. The reference implementation is the frozen `fragment-v1` experimental protocol. Development logs and retired provider runners are **not** part of the current interface.
 
-## 1. Get the code and benchmark assets
+> **Research interpretation:** A reference is an HJ-collected fragment, not necessarily a full statement or an AST-certified completion. Text similarity does not establish program correctness. `WithinTop3Guide` is an *oracle* that selects the best candidate **after** looking at the reference; it is not a deployment-ready ranking policy.
 
-- [GitHub repository](https://github.com/burhansa25/code-completion-lab)
-- [Benchmark assets on Google Drive](https://drive.google.com/drive/folders/1d95-yj7ysrPYE5agrE9aQ9HM_7niqy9Q?usp=sharing)
-
-These instructions target Ubuntu or Ubuntu under WSL2. Use a Linux environment compatible with the parser and grammar binaries in the archive. Run the commands in Bash inside Ubuntu. For Windows users who already have WSL, open the Ubuntu distribution before running them. For a fresh Windows setup, open PowerShell as administrator and run:
-
-```powershell
-wsl --install -d Ubuntu
-```
-
-Restart Windows if prompted, then launch Ubuntu and create your Linux user. See [Microsoft's WSL instructions](https://learn.microsoft.com/en-us/windows/wsl/basic-commands).
-
-Download the benchmark archive containing the top-level `PL/` directory. If Drive asks you to request access, ask the archive owner. Extract the archive into your Linux home directory. For a `.tar.gz` archive, paste its **absolute Ubuntu path** when prompted. In WSL, a file in Windows Downloads is typically under `/mnt/c/Users/<Windows-user>/Downloads/`.
+## Quick start (Ubuntu / WSL)
 
 ```bash
-(
-  set -e
-  read -erp 'Absolute Ubuntu path to the PL .tar.gz archive: ' pl_archive
-  tar -tzf "$pl_archive" > /dev/null
-  tar -xzf "$pl_archive" -C "$HOME"
-)
+git clone https://github.com/burhansa25/code-completion-lab.git
+cd code-completion-lab
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python -m unittest discover -s tests -q
 ```
 
-If the archive is a ZIP, use an archive manager and place the extracted `PL` folder in your Linux home directory. The expected paths include:
+The repository's Python runners do **not** download the HJ parser, candidate databases, source corpora, or reference reports. These are separate research assets. See [Preparing HJ data](#preparing-hj-data) below. The preparer runs the external HJ binary; its architecture/permissions must be compatible with Ubuntu/WSL. Source/reports must be accessible in the same environment.
+
+For an existing prepared dataset, the following commands make **zero API calls**:
+
+```bash
+python run_c.py --stage prepare --model grok
+python run_smallbasic.py --stage prepare --model gpt
+python -m benchmark_v2 results
+python -m benchmark_v2 stats --scope study
+python -m benchmark_v2 audit --language all --model all --scope study --limit-cases 0
+```
+
+`results` and `stats` read only existing results; they report when no saved results are available. The `--stage prepare` commands require the corresponding locally prepared HJ inputs; they do not call LLMs.
+
+### Main commands
+
+| Command | Purpose |
+| --- | --- |
+| `python run_c.py` | C benchmark; defaults to one smoke cursor |
+| `python run_smallbasic.py` | Small Basic benchmark; defaults to one smoke cursor |
+| `python -m benchmark_v2 results` | Read saved summary scores; no API |
+| `python -m benchmark_v2 stats --scope study` | Paired Top-1 minus Without + source-cluster bootstrap CI; no API |
+| `python -m benchmark_v2 audit --language all --model all --scope study` | Inspect saved predictions and formatting |
+| `python -m benchmark_v2 boundaries --language all` | Check source/reference provenance, not AST completeness |
+
+The two generation entrypoints default to `--stage all`: **without** `--stage prepare` or `--dry-run`, they may submit paid requests. Always specify a stage and read the count before authorizing an API run.
+
+## Experiment protocol
+
+Each eligible cursor has **9 tasks/model** with `--top-k 3 --ideal-repetitions 3`:
+
+- Without Guidance: 3 independently requested completions.
+- HJ guided ranks 1, 2 and 3: one completion each.
+- Ideal Guidance (reference **structure**, not reference text): 3 completions; oracle diagnostic.
+
+`WithoutGuide` is the mean of its three repetitions per cursor. `WithTop1Guide` uses ranked candidate 1; `WithinTop3Guide` is the **reference-scored best of the three guided predictions**, not the mean. Raw SacreBLEU 1-gram precision and SequenceMatcher are primary reported metrics; Sentence BLEU and exact-match/format checks are additional diagnostics. The same frozen prompts are used for both model providers, apart from the supplied structural hint and language-specific context. C defaults to last-10-line prefix-only; Small Basic uses full prefix. Do not pool cross-language performance as if context and corpus were identical.
+
+For a reproducible six-cursor exploratory pilot (no API):
+
+```bash
+python run_c.py --scope pilot --pilot-size 6 --pilot-seed 2026 --stage prepare --model grok
+python run_c.py --scope pilot --pilot-size 6 --pilot-seed 2026 --stage prepare --model gpt
+```
+
+For a **held-out** 30-cursor study, the default `--study-seed 2027` and `--study-size 30` exclude the previously frozen 6-cursor pilot cohort for the same language:
+
+```bash
+python run_smallbasic.py --scope study --study-size 30 --study-seed 2027 --stage prepare --model grok
+python run_smallbasic.py --scope study --study-size 30 --study-seed 2027 --stage prepare --model gpt
+```
+
+Each study combination plans **270 API requests**. Generation is **paid** and requires BOTH `--yes` and an explicit request budget above the default cap (200). For example, after inspecting the cohort, provider balance and cost:
+
+```bash
+# No network: review exact run ID and number of planned requests first.
+python run_c.py --scope study --stage run --model gpt --max-api-requests 270 --yes --dry-run
+
+# Only run after you explicitly approve provider charges:
+# python run_c.py --scope study --stage run --model gpt --max-api-requests 270 --yes
+```
+
+`--scope full` means **all eligible positions**, NOT a held-out study sample. It may schedule hundreds of thousands of requests. `--dry-run` performs no API calls and writes no new results. Existing tasks are resumed by Run ID/manifest without re-sending completed requests. Never modify an existing run's cases or scores.
+
+## Provider configuration
+
+Supported aliases: `grok` (xAI), `gpt`/`gpt4o` (OpenAI GPT-4o), `gptoss` (Groq). They require `XAI_API_KEY`, `OPENAI_API_KEY`, or `GROQ_API_KEY` respectively. Keys belong in **environment variables**, not in source code, a shell command pasted to chat, or Git.
+
+```bash
+# Example: load an untracked .env containing KEY="value" lines.
+set -a; source .env; set +a
+```
+
+Protect `.env` (`chmod 600 .env`) and ensure it is excluded from Git; do not upload provider responses or secrets unintentionally. A ChatGPT subscription does not supply OpenAI API credit.
+
+## Preparing HJ data
+
+Required external components: HJ `Candidate_Collection` parser and candidate database, its generated C/Small Basic reference reports, original source files, and compatible grammar shared objects. The original academic project is [SwlabTreeSitter/tree-sitter (Candidate_Collection)](https://github.com/SwlabTreeSitter/tree-sitter/tree/Candidate_Collection). The earlier setup references a separately provided [research asset archive](https://drive.google.com/drive/folders/1d95-yj7ysrPYE5agrE9aQ9HM_7niqy9Q?usp=sharing); access and distribution rights depend on the asset owners.
+
+By default, the preparers expect the historical lab layout under `~/PL/`:
 
 ```text
 ~/PL/
 ├── codecompletion_benchmarks/
 │   ├── c/TEST/
 │   └── smallbasic/
-│       ├── code-completion-extension/resources/
-│       ├── tree-sitter/reports/
-│       └── tree-sitter-smallbasic/SB_Sample/
+│       ├── tree-sitter/TreeSitterCutFile{,.exe}
+│       ├── tree-sitter/reports/{c,smallbasic}/
+│       ├── tree-sitter-smallbasic/SB_Sample/
+│       └── code-completion-extension/resources/{c,smallbasic}/
 └── tree-sitter-c/c.so
 ```
 
-## 2. Install dependencies and clone the repository
+**C (offline):**
 
 ```bash
-sudo apt update
-sudo apt install -y git python3 python3-venv gcc file
-
-git clone https://github.com/burhansa25/code-completion-lab.git "$HOME/code-completion-lab"
-cd "$HOME/code-completion-lab"
-git checkout deda840
-
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python -c 'import sacrebleu; print(sacrebleu.__version__)'
+python prepare_c_batch.py --out results/c-prepared
+# Use --source-dir, --hj-base, --grammar, --report-dir for different assets.
+python run_c.py --stage prepare --model grok
 ```
 
-If you already have a clone, run `git fetch origin` inside it before checking out `deda840`. Use this commit to reproduce the setup documented here.
+`prepare_c_batch.py` writes the same HJ batch layout (`summary.json`, per-file `prepared.jsonl` and `cases.jsonl`) as the historical C preparer, **without its retired provider runner**. An existing `results/c-prepared` or `results/c-full-infill-v1` batch can be reused; do not overwrite it or mix source versions. Preparing the entire C corpus can be computationally expensive even though it makes no API calls.
 
-## 3. Check the local assets
+**Small Basic (offline):**
 
 ```bash
-hj_base="$HOME/PL/codecompletion_benchmarks/smallbasic"
-
-ls -ld "$HOME/PL/codecompletion_benchmarks/c/TEST" \
-  "$hj_base/tree-sitter/reports/c" \
-  "$hj_base/tree-sitter/reports/smallbasic" \
-  "$hj_base/tree-sitter-smallbasic/SB_Sample"
-
-ls -l "$hj_base/code-completion-extension/resources/c/candidates.json" \
-  "$hj_base/code-completion-extension/resources/smallbasic/candidates.json" \
-  "$hj_base/code-completion-extension/resources/smallbasic/token_mapping.json"
-
-file "$hj_base/tree-sitter/TreeSitterCutFile" \
-  "$hj_base/tree-sitter/TreeSitterCutFile.exe" \
-  "$hj_base/tree-sitter-smallbasic/smallbasic.so" \
-  "$HOME/PL/tree-sitter-c/c.so"
+mkdir -p results/sb-full
+python prepare_hj_benchmark.py --all --skip-missing-reports \
+  --executable "$HOME/PL/codecompletion_benchmarks/smallbasic/tree-sitter/TreeSitterCutFile.exe" \
+  --output results/sb-full/prepared.jsonl
+python map_hj_candidates.py --input results/sb-full/prepared.jsonl \
+  --output results/sb-full/cases_mapped.jsonl
+python run_smallbasic.py --scope study --stage prepare --model grok
 ```
 
-C uses `TreeSitterCutFile`. The Small Basic commands below select `TreeSitterCutFile.exe` to match the recorded lab run. The suffix alone does not identify the binary format. If a required parser is a compatible Linux executable but lacks execute permission, restore it with `chmod u+x <path-to-parser>`. If you get `Exec format error`, use a Linux build compatible with your machine.
+The Small Basic preparer may exit **2** when some positions have no verified reference, even if it wrote the expected JSONL. Inspect the summary and errors; do not blindly ignore exit codes. In the original lab assets, **27** sources had matching HJ reports while six did not; the `--skip-missing-reports` flag deliberately excludes those six. Mapping rejects unresolved generated grammar tokens. The engine independently filters to eligible cases.
 
-## 4. Run the C benchmark
+For a one-source Small Basic smoke input, use `--file 01_HelloWorld.sb` instead of `--all --skip-missing-reports` and output under `results/sb-smoke/`.
 
-### Prepare inputs locally
+## Results, statistics, and limitations
 
-Preparation reads the original test sources, reference reports, and candidate database. It makes no API calls. From the repository root:
+Outputs live in `results/v2/<language>/<model>/<scope>/<run_id>/`. Immutable manifests, cohort selection SHA-256, provider replies, raw scoring and per-case reports are kept separately. The CLI reads historical report directories even after source cleanup:
 
 ```bash
-.venv/bin/python run_hj_c_batch.py prepare --out results/c-full-infill-v1
+python -m benchmark_v2 results --scope study --paths
+python -m benchmark_v2 stats --scope study --metric unigram
+python -m benchmark_v2 stats --scope study --export results/audits/study/paired_stats_v2.csv
+python -m benchmark_v2 audit --language c --model gpt --scope study --limit-cases 0
 ```
 
-Check `results/c-full-infill-v1/summary.json` for the number of files, preparation failures, and scheduled requests. Use a new output directory if you need to prepare again after a successful run. If your assets are in a different layout, run `.venv/bin/python run_hj_c_batch.py prepare --help` for path overrides.
+The bootstrap treats **cursor** as the paired observation and **source file** as the resampling cluster; repeated model generations are not independent cases. Intervals describe the selected deterministic/file-balanced cohort and do not guarantee generalization to all repository files. Compare model results only for identical selection hashes and matching prompt profiles. More details: [frozen protocol](docs/FINAL_FRAGMENT_PROTOCOL.md) and [reference audit limits](docs/PHASE3_REFERENCE_AUDIT.md).
 
-### Test one file with Grok
+**Legacy history:** The pre-refactor provider runners, six-task wrapper and old C batch runner were removed from the active working tree. They remain in earlier Git commits. C FIM and Small Basic lab prompt templates used for explicit historical comparisons are frozen under `benchmark_v2/prompts.py`. Removing old files changes the implementation fingerprint and hence the Run ID of any **new** generation; previously saved report directories retain their original IDs and must not be migrated or rewritten. Old `--stage report` cannot be used to recompute an old Run ID from changed source files; use the saved report and original commit instead.
 
-This step makes paid API calls. Use your own xAI key. The key is entered without echoing and is available only inside the block.
-
-```bash
-(
-  set -e
-  read -rsp 'xAI API key: ' XAI_API_KEY
-  printf '\n'
-  export XAI_API_KEY
-
-  .venv/bin/python run_hj_c_batch.py run \
-    --out results/c-full-infill-v1 \
-    --model grok --delay 0 --limit-files 1
-)
-```
-
-For GPT-4o, replace `XAI_API_KEY` with `OPENAI_API_KEY` in the block and use `--model gpt4o`. The runner uses the model IDs configured in the pinned commit. Check that your API account can access the selected model.
-
-### Run all prepared files
-
-Remove `--limit-files 1` from the same command after checking the request count and expected API cost. The lab preparation scheduled **262,008 requests per model across 106 files**. The number for your copy is in `summary.json`. The batch runner automatically skips files with completed scores and resumes partial response files if you rerun the same command with the same inputs and model. Keep one runner per model and output directory.
-
-Under `results/c-full-infill-v1/files/`, each file directory contains the prepared cases and provider-specific outputs such as `grok_responses.jsonl` and `grok_scores.csv`. C's batch command generates completions and text scores. Syntax validation is a separate step.
-
-## 5. Run the Small Basic benchmark
-
-### Prepare and map the cases locally
-
-Paste this block from the repository root. It defaults to the Hello World smoke test. To prepare the full dataset, change `sb_scope=smoke` to `sb_scope=full` before running the block.
-
-```bash
-(
-  set -e
-  sb_scope=smoke
-  sb_dir="results/sb-${sb_scope}"
-  sb_parser="$HOME/PL/codecompletion_benchmarks/smallbasic/tree-sitter/TreeSitterCutFile.exe"
-
-  if [ "$sb_scope" = full ]; then
-    selection=(--all)
-  else
-    selection=(--file 01_HelloWorld.sb)
-  fi
-
-  .venv/bin/python prepare_hj_benchmark.py \
-    --language smallbasic --executable "$sb_parser" --mode 0 \
-    "${selection[@]}" --output "$sb_dir/prepared.jsonl" \
-    || [ "$?" -eq 2 ]
-
-  .venv/bin/python - "$sb_dir" <<'PY'
-import json
-import sys
-from collections import Counter
-from pathlib import Path
-
-directory = Path(sys.argv[1])
-with (directory / "prepared.jsonl").open(encoding="utf-8") as stream:
-    rows = [json.loads(line) for line in stream if line.strip()]
-
-errors = [row for row in rows if row["status"] == "error"]
-if errors:
-    first = errors[0]
-    raise SystemExit(f"Preparation failed at {first['source_relative']}: {first['error']}")
-
-eligible = [
-    row for row in rows
-    if row["status"] == "prepared" and len(row["top_candidates"]) == 3
-]
-if not eligible:
-    raise SystemExit("No eligible cases with exactly three candidates.")
-
-with (directory / "eligible.jsonl").open("x", encoding="utf-8") as stream:
-    for row in eligible:
-        print(json.dumps(row, ensure_ascii=False), file=stream)
-
-print(f"Preparation statuses: {dict(Counter(row['status'] for row in rows))}")
-print(f"Eligible positions: {len(eligible)}")
-print(f"Requests if all eligible positions are selected: {6 * len(eligible)}")
-PY
-
-  .venv/bin/python map_hj_candidates.py \
-    --input "$sb_dir/eligible.jsonl" --output "$sb_dir/cases_mapped.jsonl"
-)
-```
-
-The preparer may return exit code 2 when some positions are ineligible. The filter retains prepared positions with three candidates and stops if the preparer recorded a parser error. The full lab input retained **1,053 positions**, or **6,318 requests per model**. Use a fresh directory for a new preparation. Keep the existing mapped input when resuming an API run.
-
-### Generate and score
-
-The following block defaults to Grok and one cursor position, producing **six paid requests**. For a full run, change `sb_scope=smoke` to `sb_scope=full` after preparing the full input. To use GPT-4o, change `provider=grok` to `provider=gpt4o` before pasting.
-
-```bash
-(
-  set -e
-  sb_scope=smoke
-  provider=grok
-  sb_dir="results/sb-${sb_scope}"
-
-  case "$provider" in
-    grok)
-      runner=run_hj_xai.py
-      model=grok-4.20-0309-non-reasoning
-      key_var=XAI_API_KEY
-      ;;
-    gpt4o)
-      runner=run_hj_openai_sb_resume.py
-      model=gpt-4o
-      key_var=OPENAI_API_KEY
-      ;;
-    *) echo "Unknown provider: $provider"; exit 1 ;;
-  esac
-
-  input="$sb_dir/cases_mapped.jsonl"
-  responses="$sb_dir/${provider}_responses.jsonl"
-  scores="$sb_dir/${provider}_scores.csv"
-  test -f "$input"
-  if [ -f "$scores" ]; then
-    printf 'Scores already exist: %s\n' "$scores"
-    exit 0
-  fi
-
-  if [ "$sb_scope" = full ]; then
-    selection=(--all-cases)
-  else
-    selection=(--cursor 10)
-  fi
-  resume=()
-  if [ -f "$responses" ]; then
-    resume=(--resume)
-  fi
-
-  read -rsp "Enter ${key_var}: " "$key_var"
-  printf '\n'
-  export "$key_var"
-
-  .venv/bin/python "$runner" run \
-    --input "$input" --output "$responses" --model "$model" \
-    "${selection[@]}" --temperature 0.5 --max-tokens 512 --delay 0 \
-    "${resume[@]}"
-
-  .venv/bin/python "$runner" score \
-    --input "$responses" --output "$scores" --sacrebleu
-)
-```
-
-Run the same block with the same settings to resume an interrupted run. A response error that repeatedly stops the runner needs inspection before another retry. For Small Basic GPT-4o, the resume runner explicitly records zero-token empty completions in the score CSV as `empty_completion`.
-
-### Optional offline syntax validation for Grok Small Basic
-
-After Grok finishes, build the validator once. It uses the Tree-sitter checkout in the benchmark assets.
-
-```bash
-.venv/bin/python offline_eval_v1/build_validator.py
-```
-
-Validate the saved completions. Change `sb_dir` to `results/sb-full` for the full run.
-
-```bash
-sb_dir=results/sb-smoke
-.venv/bin/python offline_eval_v1/offline_evaluate.py \
-  --cases "$sb_dir/cases_mapped.jsonl" \
-  --responses "$sb_dir/grok_responses.jsonl" \
-  --scores "$sb_dir/grok_scores.csv" \
-  --output-dir "$sb_dir/grok_validation"
-```
-
-This step needs the original Small Basic source files and grammar at the paths recorded in the cases. It makes no API calls. The current validator requires a successful generation for each scheduled task, so the command above targets a complete Grok run. A GPT-4o run with an `empty_completion` needs explicit handling of those failures before syntax evaluation.
-
-## 6. Share or inspect the results
-
-Share the pinned commit and the benchmark archive with collaborators. Keep API keys local. Share response and validation archives separately if collaborators need to review already-generated results.
-
-Cases generated on another machine contain that machine's absolute asset paths. For a fresh run, prepare new inputs on your machine. For an existing run, retain its original input JSONL alongside its responses so the manifest hash still matches.
-
-Text scores compare completions with a saved reference. Tree-sitter validation checks parse validity after inserting a completion into the reference span. Neither score establishes runtime behavior. A best-of-three score that uses the reference measures the best available suggestion in hindsight.
+Before releasing publicly, verify your external data distribution rights, local path overrides, Python dependencies, `.gitignore`, fresh-clone setup, and secret scanning. The external HJ binaries/corpora are not bundled in this source archive.

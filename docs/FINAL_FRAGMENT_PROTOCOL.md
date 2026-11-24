@@ -67,18 +67,23 @@ python3 -m benchmark_v2 results
 
 Then: `python3 -m benchmark_v2 results --scope pilot`, `python3 -m benchmark_v2 audit --language all --model all --scope pilot`.
 
-## 7. Promotion to two main entrypoints
+## Main entrypoints and reproducibility
 
-Once WSL offline unit/integration tests and pilot *preparation* have passed, replace the old wrappers (preserved in Git history) with the already-tested v2 3-line entrypoints:
+`run_c.py` and `run_smallbasic.py` are the sole production generation
+entrypoints. Historical provider runners and their deprecated wrapper were
+removed from the working tree after the held-out study completed; they remain
+available in Git history at checkpoint `da733fd` and earlier commits.
 
-```bash
-cp run_c_v2.py run_c.py
-cp run_smallbasic_v2.py run_smallbasic.py
-# Verify: git diff -- run_c.py run_smallbasic.py
-# Optional after all compatibility checks: git rm run_c_v2.py run_smallbasic_v2.py
-```
+The optional `--profile lab` and C FIM templates are frozen in
+`benchmark_v2/prompts.py`. New run IDs intentionally differ after this source
+cleanup because source hashes change. **Old run directories, responses, score
+files, and analysis files must never be moved into a new Run ID.** Read old
+results with `python -m benchmark_v2 results --scope study` and audit existing
+saved outputs with the read-only audit command.
 
-Do not delete `benchmark_entry.py` or legacy provider files as part of this change; they remain accessible to reproduce the historical six-task protocol, though no longer called by the primary entrypoints. Keep a Git tag to locate the last v1 runner checkpoint if necessary.
+C HJ preparation is provided by `prepare_c_batch.py` (offline only); Small
+Basic uses `prepare_hj_benchmark.py` and `map_hj_candidates.py`. Do not remove
+these active preparation tools.
 
 ## 7. Held-out main-study cohort (after the exploratory pilot)
 

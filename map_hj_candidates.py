@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Map HJ internal keyword tokens before constructing frozen v2 prompts.
 
-Python 3.9+, standard library. Requires sibling hj_benchmark_tools.py.
+Python 3.9+, standard library. Uses the frozen prompt template in benchmark_v2.prompts.
 Adapts the token-mapping step in HJ's extension (src/mapLoader.ts), with a
 conservative regex-to-keyword conversion: ambiguous regexes are never guessed.
 Keeps raw candidates, frequencies, parser states, references and retrieval ranks.
@@ -17,7 +17,7 @@ from pathlib import Path
 import re
 import sys
 
-from hj_benchmark_tools import make_prompt
+from benchmark_v2.prompts import make_prompt
 
 
 GENERATED = re.compile(r"_token\d+$")

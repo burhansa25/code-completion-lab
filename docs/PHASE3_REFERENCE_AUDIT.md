@@ -18,7 +18,7 @@ The first reuses all four existing language/model scored runs. `audit` reports r
 The second audits **all original prepared cases**, not just the single cursor selected for the smoke test. Automatic discovery expects:
 
 - C: `results/c-prepared/files/**/prepared.jsonl` (or `cases.jsonl` if preparation was imported without intermediate files).
-- Small Basic: `results/sb-smoke/prepared.jsonl` (original unmapped HJ preparation).
+- Small Basic: `results/sb-full/prepared.jsonl` if present; otherwise `results/sb-smoke/prepared.jsonl` (original unmapped HJ preparation).
 
 If cases are elsewhere, specify one language and a file/directory explicitly:
 

@@ -38,11 +38,11 @@ def discover_sources(lang, scope, c_batch, sb_input):
         default = "sb-full" if scope in {"pilot", "study", "full"} else "sb-smoke"
         path = Path(sb_input).expanduser().resolve() if sb_input else REPO / f"results/{default}/cases_mapped.jsonl"
         if not path.is_file():
-            raise FileNotFoundError(f"Mapped Small Basic cases missing: {path}. Run legacy preparation first.")
+            raise FileNotFoundError(f"Mapped Small Basic cases missing: {path}. Prepare HJ cases before benchmarking.")
         return [("smallbasic", path)]
     summary = c_batch / "summary.json"
     if not summary.is_file():
-        raise FileNotFoundError(f"C preparation summary missing: {summary}. Run legacy preparation first.")
+        raise FileNotFoundError(f"C preparation summary missing: {summary}. Prepare HJ cases before benchmarking.")
     info = json.loads(summary.read_text(encoding="utf-8"))
     if info.get("failures") or info.get("files_prepared") != info.get("reports"):
         raise ValueError(f"C preparation incomplete: {summary}")
@@ -265,8 +265,8 @@ def main(language, argv=None):
     code_names = ("benchmark_v2/cases.py", "benchmark_v2/cli.py",
                   "benchmark_v2/engine.py", "benchmark_v2/providers.py",
                   "benchmark_v2/pilot.py",
-                  "benchmark_v2/scoring.py", "hj_benchmark_tools.py",
-                  "map_hj_candidates.py", "run_hj_c_batch.py")
+                  "benchmark_v2/scoring.py", "benchmark_v2/prompts.py",
+                  "map_hj_candidates.py", "prepare_c_batch.py")
     code_hashes = {name: hashlib.sha256((REPO / name).read_bytes()).hexdigest()
                    for name in code_names if (REPO / name).is_file()}
     config["source_hashes"] = code_hashes
