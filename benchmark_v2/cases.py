@@ -132,6 +132,34 @@ def build_prompt(case, prefix, suffix, structure, *, profile, completion):
                 f"Code prefix:\n{prefix}\n")
         return (base + f"\nRequired continuation structure:\n{structure}\n" if structure is not None
                 else base + "\nProvide the next natural code continuation.\n")
+    if profile == "fragment-v1":
+        # Experimental protocol, frozen across all guidance arms.  The target
+        # reference text, reference length, and retrieval rank are never used
+        # to form the prompt.  Only the guidance arm adds a grammar structure.
+        label = "Microsoft Small Basic" if language == "smallbasic" else "C"
+        base = (
+            f"You are a code-fragment completion engine for {label}.\n"
+            "Continue the source code immediately after the cursor.\n"
+            "Return ONE compact continuation fragment, not an entire example "
+            "program or an explanation.\n"
+            "Do not repeat any existing prefix. Do not output Markdown fences.\n"
+            "Preserve source spelling, indentation, punctuation and language syntax.\n"
+            "When there is insufficient context, choose a plausible short "
+            "continuation; do not hallucinate an entire function.\n"
+        )
+        if language == "smallbasic":
+            base += (
+                "Grammar placeholders, when provided: ID denotes an identifier; "
+                "NUM a number, STR a quoted string, Expr an expression, and "
+                "Exprs an argument expression sequence. Instantiate placeholders "
+                "as code, never print their names literally.\n"
+            )
+        base += f"\nPREFIX START\n{prefix}\nPREFIX END\n"
+        if structure is None:
+            return base + "\nContinue once at the cursor. Output only the fragment.\n"
+        return (base + "\nTARGET GRAMMAR STRUCTURE:\n" + structure + "\n"
+                "Instantiate exactly one continuation matching this grammar "
+                "structure, and stop when that fragment is complete.\n")
     if profile == "monir-style":
         # A clearly labeled adaptation, NOT a claim of byte-identical reproduction.
         label = "Microsoft Small Basic" if language == "smallbasic" else "C"
@@ -182,7 +210,7 @@ def prepare_case(original, *, top_k=3, context="last10", completion="prefix",
     case["prompt_profile"] = f"v2_{profile}_{context if case['language']=='c' else 'full'}_{completion}"
     case["completion_mode"] = completion
     case["context_mode"] = context if case["language"] == "c" else "full"
-    case["experiment_version"] = "v2-rq2-1"
+    case["experiment_version"] = "v2-rq2-2" if profile == "fragment-v1" else "v2-rq2-1"
     case["planned_api_requests"] = sum(x["repetitions"] for x in conditions)
     case["prompt_sha256"] = sha_obj([c["prompt"] for c in conditions])
     return case

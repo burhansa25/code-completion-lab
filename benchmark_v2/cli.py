@@ -13,6 +13,7 @@ import sys
 from .cases import eligible, prepare_case, read_jsonl, sha_obj
 from .engine import run_one_group
 from .providers import MODELS, resolve_model
+from .boundaries import text_kind
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -33,7 +34,9 @@ def c_batch_dir(outroot, custom=None):
 
 def discover_sources(lang, scope, c_batch, sb_input):
     if lang == "smallbasic":
-        path = Path(sb_input).expanduser().resolve() if sb_input else REPO / f"results/sb-{scope}/cases_mapped.jsonl"
+        # Full/pilot reuse the previously mapped 27 paired HJ Small Basic files.
+        default = "sb-full" if scope in {"pilot", "full"} else "sb-smoke"
+        path = Path(sb_input).expanduser().resolve() if sb_input else REPO / f"results/{default}/cases_mapped.jsonl"
         if not path.is_file():
             raise FileNotFoundError(f"Mapped Small Basic cases missing: {path}. Run legacy preparation first.")
         return [("smallbasic", path)]
@@ -106,6 +109,34 @@ def safe_write_cases(path, cases, config):
     config_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
 
 
+def safe_write_cohort(path, groups, config):
+    """Save a reproducible selection manifest; no target reference text is copied."""
+    cohorts = []
+    for name, items in groups:
+        for case in items:
+            ref = case["references"][0]
+            cohorts.append({
+                "source": name,
+                "case_id": case["case_id"],
+                "cursor_byte": case["cursor_byte"],
+                "reference_kind_lexical": text_kind(ref["text"]),
+                "reference_retrieval_rank": ref.get("retrieval_rank"),
+            })
+    manifest = {"selection_schema": 1,
+                "method": "stratified_lexical_source_diversity_pre-registered" if config["scope"] == "pilot" else config["scope"],
+                "pilot_size": config.get("pilot_size"), "pilot_seed": config.get("pilot_seed"),
+                "selected": cohorts,
+                "selection_sha256": sha_obj(cohorts)}
+    content = json.dumps(manifest, indent=2, ensure_ascii=False) + "\n"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.is_file():
+        if path.read_text(encoding="utf-8") != content:
+            raise ValueError(f"Selection manifest changed: {path}")
+    else:
+        path.write_text(content, encoding="utf-8")
+    return manifest
+
+
 def report_group(runroot, groups, *, ideal_reps, plots, retrieval_sources=()):
     reporter = REPO / "tools/rq2_report.py"
     if not reporter.is_file():
@@ -128,11 +159,14 @@ def report_group(runroot, groups, *, ideal_reps, plots, retrieval_sources=()):
 def main(language, argv=None):
     p = argparse.ArgumentParser(description="Code Completion Lab v2 - RQ2 3+3+3 experiment")
     p.add_argument("--model", default="grok", choices=[*MODELS, "gpt"])
-    p.add_argument("--scope", choices=["smoke", "full"], default="smoke")
+    p.add_argument("--scope", choices=["smoke", "pilot", "full"], default="smoke")
     p.add_argument("--stage", choices=["prepare", "run", "all", "report"], default="all")
     p.add_argument("--context", choices=["last10", "full"], default="last10")
     p.add_argument("--completion", choices=["prefix", "infill"], default="prefix")
-    p.add_argument("--profile", choices=["lab", "monir-style"], default="lab")
+    p.add_argument("--profile", choices=["fragment-v1", "lab", "monir-style"], default="fragment-v1")
+    p.add_argument("--pilot-size", type=int, default=6, help="1-32 representative cursors (pilot scope only)")
+    p.add_argument("--pilot-seed", type=int, default=2026, help="Reproducible selection across providers")
+    p.add_argument("--max-api-requests", type=int, default=200, help="Hard request budget; never exceed")
     p.add_argument("--top-k", choices=[3, 10, 20], type=int, default=3)
     p.add_argument("--ideal-repetitions", choices=[1, 3], type=int, default=3)
     p.add_argument("--cursor", type=int)
@@ -144,7 +178,7 @@ def main(language, argv=None):
     p.add_argument("--c-batch-dir", type=Path)
     p.add_argument("--sb-input", type=Path)
     p.add_argument("--dry-run", action="store_true")
-    p.add_argument("--yes", action="store_true", help="Acknowledge paid API calls; required for full runs")
+    p.add_argument("--yes", action="store_true", help="Explicit authorization for pilot/full paid API calls")
     p.add_argument("--allow-topk-full", action="store_true")
     p.add_argument("--allow-unverified-fim", action="store_true")
     p.add_argument("--no-plots", action="store_true")
@@ -155,27 +189,46 @@ def main(language, argv=None):
         p.error("Small Basic v2 supports prefix-only")
     if args.completion == "infill" and args.context != "full":
         p.error("FIM requires --context full (keeps the historical C prompt)")
+    if args.completion == "infill" and args.profile == "fragment-v1":
+        p.error("Fragment-v1 protocol is prefix-only; choose --profile lab for historical FIM")
     if args.completion == "infill" and not args.allow_unverified_fim:
         p.error("FIM reference end completeness is unverified; explicitly pass --allow-unverified-fim")
     if args.scope == "full" and args.top_k > 3 and not args.allow_topk_full:
         p.error("Top-10/20 full run disabled until stratified experiment is planned: --allow-topk-full")
-    if args.scope == "full" and args.stage in {"run", "all"} and not args.yes:
-        p.error("Full API run requires explicit --yes")
+    if args.max_api_requests < 1:
+        p.error("--max-api-requests must be positive")
+    if args.scope in {"pilot", "full"} and args.stage in {"run", "all"} and not args.yes:
+        p.error("Pilot/full API runs require explicit --yes")
+    if args.scope == "pilot" and not 1 <= args.pilot_size <= 32:
+        p.error("--pilot-size must be 1-32")
+    if args.scope != "pilot" and (args.pilot_size != 6 or args.pilot_seed != 2026):
+        p.error("--pilot-size and --pilot-seed require --scope pilot")
     model_name, model = resolve_model(args.model)
     sources = discover_sources(language, args.scope,
                                c_batch_dir(args.output_root, args.c_batch_dir), args.sb_input)
-    groups = select_cases(language, sources, args.scope, args.cursor, args.top_k,
-                          include_byte0=args.include_byte0)
+    if args.scope == "pilot":
+        if args.cursor is not None:
+            p.error("--cursor is not compatible with --scope pilot")
+        from .pilot import stratified_pilot
+        groups = stratified_pilot(language, sources, size=args.pilot_size,
+                                  seed=args.pilot_seed, top_k=args.top_k)
+    else:
+        groups = select_cases(language, sources, args.scope, args.cursor, args.top_k,
+                              include_byte0=args.include_byte0)
     config = {"language": language, "scope": args.scope, "profile": args.profile,
               "context": args.context if language == "c" else "full", "completion": args.completion,
               "top_k": args.top_k, "ideal_repetitions": args.ideal_repetitions,
               "model": model_name, "model_id": model["id"], "temperature": args.temperature,
               "max_tokens": args.max_tokens, "delay": args.delay,
-              "cursor_selection": args.cursor, "schema": "v2-rq2-1"}
+              "cursor_selection": args.cursor,
+              "pilot_size": args.pilot_size if args.scope == "pilot" else None,
+              "pilot_seed": args.pilot_seed if args.scope == "pilot" else None,
+              "schema": "v2-rq2-2"}
     # Keep experiment runs isolated across implementation revisions. Do not
     # mix generated outputs from different prompt/evaluation source versions.
     code_names = ("benchmark_v2/cases.py", "benchmark_v2/cli.py",
                   "benchmark_v2/engine.py", "benchmark_v2/providers.py",
+                  "benchmark_v2/pilot.py",
                   "benchmark_v2/scoring.py", "hj_benchmark_tools.py",
                   "map_hj_candidates.py", "run_hj_c_batch.py")
     code_hashes = {name: hashlib.sha256((REPO / name).read_bytes()).hexdigest()
@@ -204,15 +257,22 @@ def main(language, argv=None):
         prepared.append((case_path, dirname))
     if not prepared:
         raise ValueError("No eligible prepared cases")
+    if args.scope == "pilot" and not args.dry_run:
+        manifest = safe_write_cohort(root / "cohort.json", groups, config)
+        print(f"Pilot selection frozen: {len(manifest['selected'])} cursors | "
+              f"SHA-256 {manifest['selection_sha256'][:16]} | {root / 'cohort.json'}")
     print(f"Run ID {run_id} | {language} | {model_name} | {args.scope} | {len(prepared)} files | {total:,} planned API calls")
     print(f"Output: {root}")
     if args.dry_run:
         print("DRY RUN: no API requests; no new results are written.")
         return 0
+    if args.stage in {"run", "all"} and total > args.max_api_requests:
+        p.error(f"Planned {total:,} API requests exceed --max-api-requests={args.max_api_requests:,}. "
+                "Increase the limit explicitly only after reviewing cost.")
     if args.stage == "prepare":
         return 0
     if args.stage in {"all", "run"}:
-        if not args.yes:
+        if not args.yes and args.scope != "smoke":
             if not sys.stdin.isatty():
                 raise ValueError("Use --yes for noninteractive API runs")
             typed = input(f"Authorize up to {total} paid API requests? Type RUN {total}: ").strip()

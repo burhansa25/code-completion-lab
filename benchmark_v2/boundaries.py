@@ -92,7 +92,8 @@ def discover_inputs(language, paths=(), root=Path("results")):
             else:
                 raise ValueError(f"No JSONL input or preparation directory: {path}")
     elif language == "smallbasic":
-        found = [root / "sb-smoke" / "prepared.jsonl"]
+        full = root / "sb-full" / "prepared.jsonl"
+        found = [full] if full.is_file() else [root / "sb-smoke" / "prepared.jsonl"]
     else:
         found = sorted((root / "c-prepared" / "files").rglob("prepared.jsonl"))
         if not found:
