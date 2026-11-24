@@ -1,0 +1,13 @@
+scope,language,model,run_id,prompt_profile,metric,cursor_count,source_count,mean_delta_pp,ci95_low_pp,ci95_high_pp,wins,losses,ties
+study,c,gpt4o,d398e7997c07c5f7,v2_fragment-v1_last10_prefix,sacrebleu_unigram_precision,30,30,10.502577805200906,2.9060441049112504,18.860681883122798,19,7,4
+study,c,gpt4o,d398e7997c07c5f7,v2_fragment-v1_last10_prefix,sequence_matcher_raw,30,30,15.488673544802065,5.852189628290739,25.706081006655392,20,7,3
+study,c,gpt4o,d398e7997c07c5f7,v2_fragment-v1_last10_prefix,sacrebleu_sentence_13a,30,30,9.080301574513951,1.9157264404031766,16.64252350666325,19,7,4
+study,c,grok,13f8968b8fec8990,v2_fragment-v1_last10_prefix,sacrebleu_unigram_precision,30,30,9.457830158699764,3.77672012738773,16.768041842284674,19,3,8
+study,c,grok,13f8968b8fec8990,v2_fragment-v1_last10_prefix,sequence_matcher_raw,30,30,11.480622351307895,5.494824167540036,18.43366225587065,21,3,6
+study,c,grok,13f8968b8fec8990,v2_fragment-v1_last10_prefix,sacrebleu_sentence_13a,30,30,7.6210033350437225,2.406431983238634,14.498316939902812,20,2,8
+study,smallbasic,gpt4o,d6be04607faaf086,v2_fragment-v1_full_prefix,sacrebleu_unigram_precision,30,27,-9.349387729822512,-23.09827216530115,3.5697806621719654,7,8,15
+study,smallbasic,gpt4o,d6be04607faaf086,v2_fragment-v1_full_prefix,sequence_matcher_raw,30,27,-7.6275169443436805,-19.804817880772955,4.393723412444906,11,8,11
+study,smallbasic,gpt4o,d6be04607faaf086,v2_fragment-v1_full_prefix,sacrebleu_sentence_13a,30,27,-9.659071060261876,-22.423389168769926,2.2153842394180874,7,8,15
+study,smallbasic,grok,e4f5901177dfa785,v2_fragment-v1_full_prefix,sacrebleu_unigram_precision,30,27,-8.213582369929119,-17.936331730898793,0.27173377018578254,7,9,14
+study,smallbasic,grok,e4f5901177dfa785,v2_fragment-v1_full_prefix,sequence_matcher_raw,30,27,-6.007579503990795,-15.40871055395659,2.684896655184773,11,11,8
+study,smallbasic,grok,e4f5901177dfa785,v2_fragment-v1_full_prefix,sacrebleu_sentence_13a,30,27,-9.701549260990218,-19.442854787738423,-1.4717384890550362,7,9,14

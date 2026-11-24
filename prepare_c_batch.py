@@ -1,26 +1,15 @@
 #!/usr/bin/env python3
-"""Prepare and run the HJ C benchmark one report at a time in Ubuntu/WSL."""
+"""Prepare reproducible HJ C candidate batches offline; no LLM/API calls."""
 import argparse
 import hashlib
 import json
-import os
 from pathlib import Path
 import subprocess
 import sys
 from collections import Counter, defaultdict
 
 
-PREFIX_SUFFIX = (
-    "Fill the gap between the following C code prefix and suffix.\n"
-    "Return only the code to insert in the gap. "
-    "The prefix and suffix remain in the file. "
-    "Do not repeat either part, including any punctuation "
-    "that already starts the suffix. Do not include Markdown.\n\n"
-)
-MODELS = {
-    "gpt4o": ("run_hj_openai.py", "gpt-4o", "OPENAI_API_KEY"),
-    "grok": ("run_hj_xai.py", "grok-4.20-0309-non-reasoning", "XAI_API_KEY"),
-}
+from benchmark_v2.prompts import PREFIX_SUFFIX
 
 
 def digest(data):
@@ -204,88 +193,22 @@ def prepare(args, repo, batch):
     return 2 if failures else 0
 
 
-def run_batch(args, repo, batch):
-    summary_path = batch / "summary.json"
-    required(summary_path)
-    summary = json.loads(summary_path.read_text(encoding="utf-8"))
-    if summary["failures"] or summary["files_prepared"] != summary["reports"]:
-        raise ValueError("Persiapan laporan C belum lengkap.")
-    runner, model, key = MODELS[args.model]
-    required(repo / runner)
-    if not os.environ.get(key, "").strip():
-        raise ValueError(f"Masukkan dan export {key} di terminal ini.")
-    if args.delay < 0:
-        raise ValueError("--delay harus nol atau lebih.")
-
-    selected = [item for item in summary["files"] if item["counts"]["llm_positions"]]
-    if args.limit_files:
-        selected = selected[:args.limit_files]
-    if not selected:
-        raise ValueError("Tidak ada file C dengan posisi siap.")
-    print(
-        f"{model}: {len(selected)} file, "
-        f"{6 * sum(item['counts']['llm_positions'] for item in selected)} "
-        "task terjadwal termasuk task yang sudah selesai.",
-        flush=True,
-    )
-    for index, item in enumerate(selected, 1):
-        cases = batch / item["cases"]
-        if digest(cases.read_bytes()) != item["cases_sha256"]:
-            raise ValueError(f"Input batch berubah: {cases}")
-        responses = cases.parent / f"{args.model}_responses.jsonl"
-        scores = cases.parent / f"{args.model}_scores.csv"
-        if scores.is_file():
-            print(f"[{index}/{len(selected)}] Skor sudah ada: {scores}", flush=True)
-            continue
-        print(f"[{index}/{len(selected)}] {item['source']}", flush=True)
-        command = [
-            sys.executable, runner, "run", "--input", str(cases),
-            "--output", str(responses), "--model", model, "--all-cases",
-            "--temperature", "0.5", "--max-tokens", "512",
-            "--delay", str(args.delay),
-        ]
-        if responses.exists():
-            command.append("--resume")
-        subprocess.run(command, cwd=repo, check=True)
-        temporary = scores.with_suffix(".tmp")
-        temporary.unlink(missing_ok=True)
-        subprocess.run(
-            [
-                sys.executable, runner, "score", "--input", str(responses),
-                "--output", str(temporary), "--sacrebleu",
-            ],
-            cwd=repo, check=True,
-        )
-        temporary.replace(scores)
-    return 0
-
-
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    commands = parser.add_subparsers(dest="command", required=True)
-    prep = commands.add_parser("prepare", help="Persiapan lokal dan Top-N, tanpa API")
-    prep.add_argument("--out", type=Path, required=True)
-    prep.add_argument("--hj-base", type=Path,
-                      default=Path.home() / "PL/codecompletion_benchmarks/smallbasic")
-    prep.add_argument("--source-dir", type=Path,
-                      default=Path.home() / "PL/codecompletion_benchmarks/c/TEST")
-    prep.add_argument("--grammar", type=Path,
-                      default=Path.home() / "PL/tree-sitter-c/c.so")
-    prep.add_argument("--report-dir", type=Path)
-    run = commands.add_parser("run", help="Generasi berbayar dan scoring per file")
-    run.add_argument("--out", type=Path, required=True)
-    run.add_argument("--model", choices=MODELS, required=True)
-    run.add_argument("--delay", type=float, default=0)
-    run.add_argument("--limit-files", type=int)
-    args = parser.parse_args()
+    parser.add_argument("--out", type=Path, required=True,
+                        help="Output directory for C prepared summary and cases")
+    parser.add_argument("--hj-base", type=Path,
+                        default=Path.home() / "PL/codecompletion_benchmarks/smallbasic")
+    parser.add_argument("--source-dir", type=Path,
+                        default=Path.home() / "PL/codecompletion_benchmarks/c/TEST")
+    parser.add_argument("--grammar", type=Path,
+                        default=Path.home() / "PL/tree-sitter-c/c.so")
+    parser.add_argument("--report-dir", type=Path)
+    args = parser.parse_args(argv)
     repo = Path(__file__).resolve().parent
     batch = args.out.expanduser().resolve()
     try:
-        if args.command == "prepare":
-            return prepare(args, repo, batch)
-        if args.limit_files is not None and args.limit_files < 1:
-            raise ValueError("--limit-files harus minimal 1.")
-        return run_batch(args, repo, batch)
+        return prepare(args, repo, batch)
     except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
