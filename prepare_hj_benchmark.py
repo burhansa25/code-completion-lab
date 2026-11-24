@@ -113,6 +113,8 @@ def parse_args():
     group.add_argument("--file", default=None,
                        help="Source path relative to source-dir; default 01_HelloWorld.sb")
     group.add_argument("--all", action="store_true", help="Process all source files")
+    p.add_argument("--skip-missing-reports", action="store_true",
+                   help="With --all, process only sources with matching HJ JSON reports")
     p.add_argument("--mode", type=int, choices=[0, 2], default=0)
     p.add_argument("--timeout", type=float, default=30)
     p.add_argument("--output", type=Path, required=True,
@@ -122,6 +124,8 @@ def parse_args():
 
 def main():
     args = parse_args()
+    if args.skip_missing_reports and not args.all:
+        raise ValueError("--skip-missing-reports requires --all")
     base = args.base.expanduser().resolve()
     parser = base / "tree-sitter"
     extension = base / "code-completion-extension"
@@ -152,6 +156,21 @@ def main():
         sources = [(source_dir / (args.file or "01_HelloWorld.sb")).resolve()]
     if not sources:
         raise ValueError("No source files selected")
+    skipped_missing = []
+    if args.skip_missing_reports:
+        paired = []
+        for source in sources:
+            relative = source.relative_to(source_dir).as_posix()
+            safe_name = relative.replace("/", "_").replace("..", "")
+            if (reference_dir / (safe_name + ".json")).is_file():
+                paired.append(source)
+            else:
+                skipped_missing.append(relative)
+        sources = paired
+        if not sources:
+            raise ValueError("No source files have matching HJ reference reports")
+        print(f"Selected {len(sources)} source/report pairs; "
+              f"skipped {len(skipped_missing)} source(s) without reports.")
     provenance = {
         "parser_path": str(executable), "parser_sha256": digest(executable),
         "grammar_path": str(grammar), "grammar_sha256": digest(grammar),
@@ -224,6 +243,8 @@ def main():
             handle.write(json.dumps(row, ensure_ascii=False) + "\n")
     counts = dict(Counter(row["status"] for row in rows))
     print("\nSummary:", json.dumps(counts))
+    if skipped_missing:
+        print("Skipped sources without reports:", ", ".join(skipped_missing))
     print("Saved:", output)
     print("No API calls made. Reference slice matches do not prove complete spans.")
     return 2 if any(row["status"] != "prepared" for row in rows) else 0
