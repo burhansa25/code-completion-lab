@@ -88,6 +88,8 @@ The important **default asset paths** *inside* those PL directories are:
 | HJ structure candidates | `codecompletion_benchmarks/smallbasic/code-completion-extension/resources/{c,smallbasic}/candidates.json` |
 | Small Basic token map | `codecompletion_benchmarks/smallbasic/code-completion-extension/resources/smallbasic/token_mapping.json` |
 
+**Dataset terminology: `source programs` versus `training data`.** The `.c` and `.sb` files stored under `~/PL` are **source programs / source-code files**. Taken together, they form a **source-code corpus**; in this project they are the **benchmark/evaluation corpus** (programs from which cursor positions, prefixes, and reference continuations are obtained). They are **not a model-training dataset in this pipeline**: `code-completion-lab` sends prompts to existing LLM APIs but does not fine-tune or update model weights. The HJ `candidates.json` files are **grammar-candidate databases** (parser-state → candidate structures/frequencies), not a trained neural model. HJ reports supply reference continuation metadata; source/program files and HJ reports must correspond to each other. Additional programs placed in `~/PL` are **not automatically benchmarked** unless the preparation pipeline can find and validate their matching reference reports and other required assets.
+
 **Important distinction:** cloning `PL/tree-sitter` and `PL/code-completion-extension` **does not automatically put the required binaries, reports and candidate JSON files into** `PL/codecompletion_benchmarks/smallbasic/`. The parser output and candidate database locations above are **the current tool defaults**, built around the lab's separately provided benchmark assets. The exact PL layout can differ; adapt via `--base`, `--hj-base`, `--source-dir`, `--grammar`, `--reference-dir`, `--database`, or `--executable` instead of rewriting Python source paths.
 
 The `PL` directory is **not a Python virtual environment**. Its parser executable is called as a separate process. You should run Python commands **from `code-completion-lab/`**, with that repository's `.venv` activated. The external parser and grammar are compiled/native assets; Python `pip install` does not build them.
@@ -421,6 +423,64 @@ python run_c.py --scope study --stage report --model gpt --no-plots
 ```
 
 For **historical runs whose code fingerprint changed during refactor**, do **not** use `--stage report` to recreate the old ID. Read their saved reports using the commands in Section 10. Every new code version can generate a different Run ID even with identical user flags.
+
+### 8.1 Full corpus execution (advanced, high-cost)
+
+`--scope full` selects **every eligible cursor from the prepared HJ input**, not every byte offset or every source file stored under `~/PL`. For the standard Top-3 experiment, eligibility requires `status=prepared`, exactly one reference, and at least three candidate structures. A full run follows the **same frozen 9-request-per-cursor protocol** as the study: Without ×3 + HJ guided rank 1/2/3 ×1 each + Ideal ×3. Top-3 in the reports is an **oracle evaluation over the three guided outputs**, not an extra model request or an automated deployable choice.
+
+**Verified offline `--scope full --stage prepare --dry-run` on the current prepared inputs:**
+
+| Language | Eligible cursor positions | Expected provider requests / model | Input grouping shown by CLI |
+| --- | ---: | ---: | --- |
+| C | 43,668 | **393,012** | `106 files` (C case files/source groups) |
+| Small Basic | 1,053 | **9,477** | `1 files` (**one combined `cases_mapped.jsonl` input group**, **not one `.sb` program**) |
+| Both | **44,721** | **402,489** | Per model; twice this total for two models |
+
+These are verified **selection/request counts, not completed paid runs**. The original Small Basic paired dataset covered 27 `.sb` source/report pairs; the CLI groups those cases into one mapped JSONL. Your available sources, reference reports, and Top-K setting can change the eligible counts. This check does not verify every native HJ parser invocation or all paid API requests end to end.
+
+**Recommended offline workflow** (from the `code-completion-lab` root, with `.venv` activated; first complete [Section 6](#6-prepare-the-hj-data-offline)):
+
+```bash
+# Preview selections without API requests or new output files.
+python run_c.py --scope full --stage prepare --model gpt --dry-run
+python run_smallbasic.py --scope full --stage prepare --model gpt --dry-run
+
+# Optional: persist all frozen prepared LLM cases, still without an API call.
+# Only run when storage and processing time are acceptable.
+python run_c.py --scope full --stage prepare --model gpt
+python run_smallbasic.py --scope full --stage prepare --model gpt
+```
+
+**Do not mistake the default budget for batching:** `--max-api-requests 200` is a **whole-run scheduled-request safeguard**. It does **not** execute the first 200 requests of a 393,012-request plan. There is currently **no cursor-chunk/offset selector for `--scope full`** and no currency-based spending cap. A paid full run requires explicitly raising `--max-api-requests` above the **entire** planned total and passing `--yes`; it can be extremely expensive and slow. **We do not recommend doing this for routine validation.** The existing engine can resume completed tasks after interruption, but `--max-api-requests` still compares against the total planned requests upon resumption, not only the pending ones.
+
+Once a full run is prepared, the **paid execution pattern** (illustrative, **do not execute without budget approval, quotas, and adequate storage**) is:
+
+```bash
+# PAID / LARGE: C–GPT-4o (393,012 planned API requests at this dataset version).
+python run_c.py --scope full --stage run --model gpt \
+  --max-api-requests 393012 --yes --no-plots
+
+# PAID / LARGE: Small Basic–GPT-4o (9,477 planned API requests).
+python run_smallbasic.py --scope full --stage run --model gpt \
+  --max-api-requests 9477 --yes --no-plots
+```
+
+To use Grok, **repeat both `--stage prepare` and the paid `--stage run` with `--model grok`**, confirming new Run IDs and request budgets for that provider. Re-run the **identical** command to resume a partially completed run; preserve its source, prepared cases, model ID, parameters, code version, and output directory. A failed/incomplete generation stops execution but retains existing completed responses. If you need affordable incremental paid batches, implement and test **explicit cursor chunking and per-batch budget controls in a subsequent version** rather than assuming `--max-api-requests` provides chunking.
+
+After completion, the existing reporting commands can read the saved output:
+
+```bash
+# Report only if this exact code/configuration matches the prepared Run ID.
+python run_c.py --scope full --stage report --model gpt --no-plots
+python run_smallbasic.py --scope full --stage report --model gpt --no-plots
+
+# Read-only summaries (requires completed full-run score files).
+python -m benchmark_v2 results --scope full
+python -m benchmark_v2 stats --scope full --metric unigram
+python -m benchmark_v2 audit --language c --model gpt --scope full --limit-cases 0
+```
+
+For a full workflow checklist, expected output artifacts, non-eligible-case accounting, disk/cost precautions and interpretation, see **[`docs/FULL_CORPUS_EXECUTION.md`](docs/FULL_CORPUS_EXECUTION.md)**. Because the source, report and candidate DB assets live under `~/PL`, **do not upload them to Git automatically**; this repository stores generated data under the Git-ignored `results/` directory.
 
 ## 9. All runner options and advanced experiments
 
