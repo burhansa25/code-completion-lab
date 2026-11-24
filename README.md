@@ -618,6 +618,16 @@ The following published figures are **micro-average percentages across the 30 se
 | Small Basic / GPT-4o | 45.42 | 36.07 | 51.55 | 47.73 |
 | Small Basic / Grok | 34.53 | 26.32 | 47.32 | 31.57 |
 
+### Main Study Cursor Selection
+
+The main study evaluates **30 fixed, held-out cursor positions per language** (60 unique positions across C and Small Basic). The same language-specific cohort is used for both GPT-4o and Grok to ensure paired comparisons.
+
+Cursor selection is deterministic (`study_seed=2027`), excludes the six pilot positions per language, and prioritizes lexical diversity and source-file coverage. The selected cohort is not intended to be a probability sample of the entire corpus.
+
+The complete list of selected cursors—including source-file paths, byte offsets, case IDs, lexical categories, and reference retrieval ranks—is available in **[Main Study Cohort (CSV)](docs/main_study_cohort.csv)**.
+
+The published results are descriptive of these selected positions. They should not be interpreted as population-level estimates.
+
 Paired **Top-1 minus Unguided**, raw SacreBLEU 1-gram precision (percentage-point difference; source-cluster bootstrap, 95% percentile CI):
 
 | Language / model | Delta (pp) | 95% CI (pp) | Improved / worse / equal cursors |
